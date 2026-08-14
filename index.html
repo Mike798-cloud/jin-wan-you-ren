@@ -7,6 +7,7 @@
   <meta name="description" content="《今晚有人进过我家》——普通独居者视角的二维写实恐怖悬疑网页游戏。" />
   <title>今晚有人进过我家</title>
   <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="paywall.css" />
 </head>
 <body>
   <div id="app">
@@ -38,6 +39,7 @@
           <button data-panel="notes" aria-label="记事">记事</button>
           <button data-panel="map" aria-label="位置">位置</button>
           <button data-panel="hint" aria-label="提示">提示</button>
+          <button id="supportAuthorBtn" class="support-author-btn" type="button" aria-label="支持作者 1元">支持作者 1元</button>
           <button data-panel="settings" aria-label="设置">设置</button>
         </div>
       </header>
@@ -86,5 +88,6 @@
     <div id="toast" class="toast hidden" aria-live="polite"></div>
   </div>
   <script src="game.js"></script>
+  <script src="paywall.js"></script>
 </body>
 </html>
