@@ -39,17 +39,17 @@ const STAGE_INFO={
 };
 
 const objectives={
-  [STAGE.HOME]:'先检查最不对劲的三处细节，不要急着给它们下结论。',
-  [STAGE.MEMORY]:'用早晨留下的客观记录，确认自己有没有记错。',
-  [STAGE.CONTACT]:'问清备用钥匙、房东行踪和704维修，不要只问“有人来过吗”。',
-  [STAGE.CHECK]:'重新检查客厅、卧室和卫生间，寻找能互相印证的异常。',
-  [STAGE.TIMELINE]:'打开手机“记录”，把今晚的时间线排清楚，再找出真正矛盾的两条。',
-  [STAGE.CHAIN]:'回到入户门。门锁没坏，不代表门就是唯一入口。',
-  [STAGE.HALL]:'检查704、维修通知和703邻居。三处都问清楚再作判断。',
-  [STAGE.ROUTE]:'打开“记事”，用现有事实拼出最合理的进入路线。',
-  [STAGE.GAP]:'回卧室检查衣柜背板。先看痕迹，再决定要不要动它。',
-  [STAGE.IDENTITY]:'名字出现了，但名字不是结论。把徐洲和704/夹层真正连起来。',
-  [STAGE.FINAL]:'查看徐洲的新消息，并区分“已经证明”与“只是害怕”。',
+  [STAGE.HOME]:'别急着解释。先确认哪些细节真的和早上不一样。',
+  [STAGE.MEMORY]:'如果不信自己的记忆，就找今天早上留下的东西。',
+  [STAGE.CONTACT]:'先排除最普通、也最容易想到的进入方式。',
+  [STAGE.CHECK]:'再走一遍熟悉的房间，看有没有第二层异常。',
+  [STAGE.TIMELINE]:'现在最重要的不是继续翻东西，而是时间。',
+  [STAGE.CHAIN]:'回头重新看一遍门。',
+  [STAGE.HALL]:'走廊里有几处信息值得分别确认。',
+  [STAGE.ROUTE]:'把已经确认的事实放在一起，不要让猜测混进去。',
+  [STAGE.GAP]:'沿着刚才的推理，找一处能被实际验证的痕迹。',
+  [STAGE.IDENTITY]:'先证明这个名字和今晚的路线有关。',
+  [STAGE.FINAL]:'别让恐惧替你把证据说得太满。',
   [STAGE.END]:'今晚结束了。你可以回看结局档案，或从中段快速复盘。'
 };
 
@@ -128,18 +128,51 @@ function ensureAudio(){
 function startAmbient(){
   if(state.flags.ambient===false||ambientNodes.length)return;
   const ctx=ensureAudio();if(!ctx)return;
-  const master=ctx.createGain();master.gain.value=.035;master.connect(ctx.destination);
-  const low=ctx.createOscillator();low.type='sine';low.frequency.value=46;const lowG=ctx.createGain();lowG.gain.value=.09;low.connect(lowG).connect(master);low.start();
-  const buffer=ctx.createBuffer(1,ctx.sampleRate*2,ctx.sampleRate);const data=buffer.getChannelData(0);for(let i=0;i<data.length;i++)data[i]=(Math.random()*2-1)*.17;
-  const noise=ctx.createBufferSource();noise.buffer=buffer;noise.loop=true;const filter=ctx.createBiquadFilter();filter.type='lowpass';filter.frequency.value=380;const ng=ctx.createGain();ng.gain.value=.035;noise.connect(filter).connect(ng).connect(master);noise.start();
-  ambientNodes=[low,lowG,noise,filter,ng,master];
-  ambientTimer=setInterval(()=>{if(els.game.classList.contains('hidden')||state.flags.ambient===false)return;const r=Math.random();if(r<.34)playPipe();else if(r<.52&&state.stage>=STAGE.CHECK)playMetal(false)},26000);
+  const master=ctx.createGain();master.gain.value=.026;master.connect(ctx.destination);
+  const low=ctx.createOscillator();low.type='triangle';low.frequency.value=43;
+  const lowG=ctx.createGain();lowG.gain.value=.03;low.connect(lowG).connect(master);low.start();
+  const room=ctx.createOscillator();room.type='sine';room.frequency.value=93;
+  const roomG=ctx.createGain();roomG.gain.value=.006;room.connect(roomG).connect(master);room.start();
+  const buffer=ctx.createBuffer(1,ctx.sampleRate*2,ctx.sampleRate);const data=buffer.getChannelData(0);for(let i=0;i<data.length;i++)data[i]=(Math.random()*2-1)*.15;
+  const noise=ctx.createBufferSource();noise.buffer=buffer;noise.loop=true;
+  const filter=ctx.createBiquadFilter();filter.type='lowpass';filter.frequency.value=320;
+  const ng=ctx.createGain();ng.gain.value=.018;noise.connect(filter).connect(ng).connect(master);noise.start();
+  ambientNodes=[low,lowG,room,roomG,noise,filter,ng,master];
+  scheduleAmbientMoment();
 }
-function stopAmbient(){clearInterval(ambientTimer);ambientTimer=null;try{ambientNodes.forEach(n=>{if(n.stop)n.stop();if(n.disconnect)n.disconnect()})}catch(e){}ambientNodes=[]}
+function scheduleAmbientMoment(){
+  clearTimeout(ambientTimer);
+  if(state.flags.ambient===false||!ambientNodes.length)return;
+  const tense=state.stage>=STAGE.HALL;
+  const min=tense?12000:19000,max=tense?24000:34000;
+  ambientTimer=setTimeout(()=>{if(!els.game.classList.contains('hidden')&&state.flags.ambient!==false)triggerAmbientMoment();scheduleAmbientMoment();},min+Math.random()*(max-min));
+}
+function stopAmbient(){clearTimeout(ambientTimer);ambientTimer=null;try{ambientNodes.forEach(n=>{if(n.stop)n.stop();if(n.disconnect)n.disconnect()})}catch(e){}ambientNodes=[]}
 function playTone(freq=180,dur=.15,type='sine',gain=.025,delay=0){const ctx=ensureAudio();if(!ctx)return;const o=ctx.createOscillator(),g=ctx.createGain();o.type=type;o.frequency.value=freq;g.gain.setValueAtTime(0,ctx.currentTime+delay);g.gain.linearRampToValueAtTime(gain,ctx.currentTime+delay+.01);g.gain.exponentialRampToValueAtTime(.0001,ctx.currentTime+delay+dur);o.connect(g).connect(ctx.destination);o.start(ctx.currentTime+delay);o.stop(ctx.currentTime+delay+dur+.03)}
-function playPipe(){playTone(112,.2,'sine',.012);playTone(83,.28,'sine',.008,.11)}
-function playMetal(strong=true){playTone(920,.08,'triangle',strong?.032:.012);playTone(610,.12,'triangle',strong?.023:.008,.06)}
+function playNoiseBurst(dur=.25,gain=.009,hz=900,type='bandpass',delay=0){const ctx=ensureAudio();if(!ctx)return;const buffer=ctx.createBuffer(1,Math.floor(ctx.sampleRate*dur),ctx.sampleRate);const data=buffer.getChannelData(0);for(let i=0;i<data.length;i++)data[i]=(Math.random()*2-1)*(1-i/data.length);const src=ctx.createBufferSource();src.buffer=buffer;const filter=ctx.createBiquadFilter();filter.type=type;filter.frequency.value=hz;const g=ctx.createGain();g.gain.setValueAtTime(gain,ctx.currentTime+delay);g.gain.exponentialRampToValueAtTime(.0001,ctx.currentTime+delay+dur);src.connect(filter).connect(g).connect(ctx.destination);src.start(ctx.currentTime+delay);src.stop(ctx.currentTime+delay+dur+.02)}
+function playPipe(){playTone(118,.22,'sine',.010);playTone(84,.35,'sine',.007,.10);playNoiseBurst(.12,.004,620,'bandpass',.05)}
+function playMetal(strong=true){playTone(910,.07,'triangle',strong?.028:.011);playTone(630,.12,'triangle',strong?.02:.007,.05);playNoiseBurst(.07,strong?.006:.003,2400,'highpass',.02)}
 function playBuzz(){playTone(146,.09,'square',.018);playTone(146,.09,'square',.018,.15)}
+function playElevatorBell(){playTone(988,.08,'sine',.012);playTone(1319,.10,'sine',.009,.09)}
+function playNeighborThump(){playTone(72,.18,'triangle',.010);playNoiseBurst(.10,.004,180,'lowpass',.01)}
+function playWaterDrip(){playTone(780,.03,'sine',.006);playTone(540,.06,'sine',.004,.04)}
+function playFridgeHum(){playTone(58,.40,'sine',.005);playTone(116,.26,'triangle',.003,.05)}
+function playWoodCreak(){playTone(164,.20,'sawtooth',.004);playTone(124,.31,'triangle',.005,.08);playNoiseBurst(.18,.003,420,'bandpass',.03)}
+let lastSceneCue='',lastSceneCueAt=0;
+function playSceneEntryCue(scene){
+  if(state.flags.ambient===false)return;
+  const now=Date.now();if(scene===lastSceneCue&&now-lastSceneCueAt<12000)return;lastSceneCue=scene;lastSceneCueAt=now;
+  setTimeout(()=>{if(scene!==state.scene)return;if(scene==='entry')playFridgeHum();if(scene==='living'&&state.stage>=STAGE.CHECK)playNeighborThump();if(scene==='bedroom'&&state.stage>=STAGE.GAP)playWoodCreak();if(scene==='bathroom')playWaterDrip();if(scene==='hallway')playElevatorBell();},650+Math.random()*650);
+}
+function triggerAmbientMoment(){
+  const r=Math.random();
+  if(state.scene==='entry'){if(r<.38)playFridgeHum();else if(r<.7)playPipe();else playElevatorBell();return}
+  if(state.scene==='living'){if(r<.42)playNeighborThump();else if(r<.72)playElevatorBell();else playPipe();return}
+  if(state.scene==='bedroom'){if(r<.34)playNeighborThump();else if(r<.64)playWoodCreak();else if(r<.84)playMetal(false);else playElevatorBell();return}
+  if(state.scene==='bathroom'){if(r<.55)playWaterDrip();else if(r<.8)playPipe();else playNeighborThump();return}
+  if(state.scene==='hallway'){if(r<.35)playElevatorBell();else if(r<.65)playMetal(false);else playNeighborThump();return}
+  if(r<.5)playPipe();else playMetal(false)
+}
 
 function addClue(id,optional=false,silent=false){
   const arr=optional?state.optional:state.clues;if(arr.includes(id))return false;arr.push(id);if(!silent)toast(optional?'发现额外信息':'记住了一条有效信息');safeSave();renderUI();checkAutoAdvance();return true;
@@ -153,10 +186,10 @@ function checkAutoAdvance(){
     setStage(STAGE.TIMELINE,'23:20');setTimeout(()=>{playBuzz();eventText('你需要停止继续翻东西。<br>先把今晚的时间排清楚。手机里有公司签退、打车和门锁记录。')},220);
   }
   if(state.stage===STAGE.HALL&&['maintenance','shaftNotice','neighbor'].every(has)){
-    setStage(STAGE.ROUTE,'23:37');setTimeout(()=>eventText('三处信息开始指向同一个方向。<br>但在拆衣柜之前，你需要先证明“另一条入口”真的比复制钥匙更合理。'),220);
+    setStage(STAGE.ROUTE,'23:37');setTimeout(()=>eventText('三处信息开始互相咬合。<br>先把路线说清楚，再决定下一步去哪里。'),220);
   }
   if(state.stage===STAGE.GAP&&['tag','delivery','nest'].every(has)){
-    setStage(STAGE.IDENTITY,'23:47');setTimeout(()=>eventText('夹层里出现了一个名字。<br>但名字不是结论——你还需要证明这个名字和“帮你搬家的人”是同一个人。'),220);
+    setStage(STAGE.IDENTITY,'23:47');setTimeout(()=>eventText('夹层里第一次出现了一个具体名字。<br>先别急着把名字当成答案。'),220);
   }
 }
 
@@ -166,7 +199,7 @@ function renderUI(){
   const n=state.clues.length;els.danger.textContent=n<4?'也许只是你记错了。':n<9?'越来越难解释成巧合。':n<15?'这个家现在并不安全。':'不要再假设你掌握了全部情况。';
   renderNav();renderScene();updateTitleButtons();
 }
-function go(scene){if(scene==='hallway'&&state.stage<STAGE.HALL){toast('现在还没有充分理由去敲邻居和查704');return}state.scene=scene;if(!state.visited.includes(scene))state.visited.push(scene);safeSave();renderUI()}
+function go(scene){if(scene==='hallway'&&state.stage<STAGE.HALL){toast('现在还没有充分理由去敲邻居和查704');return}state.scene=scene;if(!state.visited.includes(scene))state.visited.push(scene);safeSave();renderUI();playSceneEntryCue(scene)}
 function renderNav(){const order=['entry','living','bedroom','bathroom','hallway'];els.nav.innerHTML='';order.forEach(id=>{const b=document.createElement('button');const locked=id==='hallway'&&state.stage<STAGE.HALL;b.textContent=SCENES[id].name;b.className=(id===state.scene?'current ':'')+(locked?'locked':'');b.disabled=locked;b.onclick=()=>go(id);els.nav.appendChild(b)})}
 function hs(id,x,y,w,h,fn,label){const b=document.createElement('button');b.className='hotspot';b.dataset.hotspot=id;b.style.cssText=`left:${x}%;top:${y}%;width:${w}%;height:${h}%`;b.setAttribute('aria-label',label||'调查');b.onclick=fn;els.hotspots.appendChild(b)}
 function inspect(title,text,actions=''){openModal(`<h2>${title}</h2><p>${text}</p>${actions}`)}
@@ -174,7 +207,7 @@ function renderScene(){const scene=SCENES[state.scene]||SCENES.entry;els.img.src
 
 function renderEntry(){
   hs('shoes',73,68,23,29,()=>{addClue('shoes');inspect('玄关的拖鞋','左脚朝里，右脚压在鞋柜边。你记得早上扫地时把两只都并排推到了柜子下面。<br><br>现在先把它记下来，不要急着相信记忆。')},'玄关鞋柜');
-  hs('fridge',33,27,18,39,()=>{addClue('bottle');inspect('冰箱','最上层多了一瓶你从不买的常温矿泉水，瓶盖已经拧开过。<br><br>你平时只买苏打水。')},'冰箱');
+  hs('fridge',33,27,18,39,()=>{playFridgeHum();addClue('bottle');inspect('冰箱','最上层多了一瓶你从不买的常温矿泉水，瓶盖已经拧开过。<br><br>你平时只买苏打水。')},'冰箱');
   hs('door',77,25,20,46,()=>{
     if(state.stage<STAGE.CHAIN){inspect('入户门','锁舌、门框和猫眼都正常。没有撬痕。<br><br>你用自己的钥匙开门进来——至少这一点很清楚。');return}
     addClue('chain');playMetal(true);
@@ -183,34 +216,34 @@ function renderEntry(){
   hs('counter',48,55,18,24,()=>{if(state.stage>=STAGE.CONTACT)inspect('餐桌边','碗、杯垫、纸巾都在。你强迫自己看了一遍正常的东西。<br><br>至少这里没有新的异常。');else inspect('餐桌边','和早上差不多。你现在更在意玄关和冰箱。')},'餐桌');
 }
 function renderLiving(){
-  hs('bin',1,55,23,38,()=>{if(state.stage<STAGE.CHECK){inspect('客厅角落','纸袋、外卖包装、旧报纸。现在看不出什么。')}else{addClue('twoCups');addClue('receipt',true);inspect('垃圾桶','最上面压着两个同款一次性咖啡杯。你今天没有买咖啡回家。<br><br>下面还有一张揉皱的便利店小票：<b>21:36</b>。而你22点以后还在公司。')}} ,'垃圾桶');
-  hs('table',56,55,28,30,()=>{if(state.stage===STAGE.MEMORY){inspect('茶几','手机就在这里。相册里有今早07:12的照片。',`<button class="modal-action" onclick="window.__memoryPuzzle()">打开早晨照片核对</button>`)}else if(state.stage>=STAGE.CHECK){addClue('cushion',true);inspect('茶几和沙发','遥控器、书、充电线都在。旁边的靠垫却翻到了你平时从不用的那一面。<br><br>它本身不能证明什么，只能作为额外细节记下。')}else inspect('茶几','手机、充电线、昨晚没看完的书。')},'茶几');
-  hs('window',73,8,26,52,()=>{if(state.stage>=STAGE.CHECK){inspect('客厅窗边','窗锁没有动过，窗外也没有可攀爬的平台。<br><br>这条路线可以先排除。')}else inspect('窗边','窗户锁着。城市的灯从窗帘边缘透进来。')},'窗边');
-  hs('sofa',64,52,35,42,()=>{if(state.stage>=STAGE.CHECK){addClue('cushion',true);inspect('沙发','靠垫的拉链朝外。你每次坐下都会把拉链面压到里侧。<br><br>这只是弱异常，不值得单独下结论。')}else inspect('沙发','你本来只想坐五分钟。现在完全没有困意。')},'沙发');
+  hs('bin',60,54,18,28,()=>{if(state.stage<STAGE.CHECK){inspect('客厅角落','靠窗的小垃圾桶里只有纸巾团和快递塑料袋。现在看不出什么。')}else{addClue('twoCups');addClue('receipt',true);inspect('垃圾桶','最上面压着两个同款一次性咖啡杯。你今天没有买咖啡回家。<br><br>下面还有一张揉皱的便利店小票：<b>21:36</b>。而你22点以后还在公司。')}} ,'垃圾桶');
+  hs('table',44,60,20,24,()=>{if(state.stage===STAGE.MEMORY){inspect('茶几','手机就在茶几上。相册里有今早07:12的照片。',`<button class="modal-action" onclick="window.__memoryPuzzle()">打开早晨照片核对</button>`)}else if(state.stage>=STAGE.CHECK){addClue('cushion',true);inspect('茶几和沙发','遥控器、纸巾和杯垫都在。旁边的靠垫却翻到了你平时从不用的那一面。<br><br>它本身不能证明什么，只能作为额外细节记下。')}else inspect('茶几','手机、杯垫、昨晚没看完的书。')},'茶几');
+  hs('window',41,13,26,38,()=>{if(state.stage>=STAGE.CHECK){inspect('客厅窗边','窗锁没有动过，窗外也没有可攀爬的平台。<br><br>这条路线可以先排除。')}else inspect('窗边','窗户锁着。城市的灯从窗帘边缘透进来。')},'窗边');
+  hs('sofa',20,47,29,34,()=>{if(state.stage>=STAGE.CHECK){addClue('cushion',true);inspect('沙发','靠垫的拉链朝外。你每次坐下都会把拉链面压到里侧。<br><br>这只是弱异常，不值得单独下结论。')}else inspect('沙发','你本来只想坐五分钟。现在完全没有困意。')},'沙发');
 }
 function renderBedroom(){
-  hs('curtain',75,1,24,58,()=>{if(state.stage>=STAGE.CHECK){addClue('curtain');inspect('卧室窗帘','右侧帘布被完全拉到轨道尽头。你早上为了让植物晒太阳，留了大约半扇窗的空隙。')}else inspect('窗帘','拉得很严。你暂时不想把任何细节都当成异常。')},'窗帘');
-  hs('bedside',2,28,23,36,()=>{
+  hs('curtain',20,7,27,46,()=>{if(state.stage>=STAGE.CHECK){addClue('curtain');inspect('卧室窗帘','右侧帘布被完全拉到轨道尽头。你早上为了让植物晒太阳，留了大约半扇窗的空隙。')}else inspect('窗帘','拉得很严。你暂时不想把任何细节都当成异常。')},'窗帘');
+  hs('bedside',0,47,24,37,()=>{
     if(state.stage>=STAGE.IDENTITY&&!hasOpt('movingPhoto')){addClue('movingPhoto',true);inspect('床头相框','搬家那天的合照压在书下面。徐洲站在你身后，腰侧挂着一个绿色塑料工程牌。<br><br>它和夹层里那枚牌的颜色、形状都很接近。');return}
     if(state.stage>=STAGE.CHECK&&!has('charger')){addClue('charger');inspect('床头插座','你的充电线被插在右侧墙插。你从来不用这个口，因为床头柜会压住插头。<br><br>线没有坏，只是位置不对。');return}
     inspect('床头','相框、充电线、一本没读完的书。');
   },'床头');
-  hs('wardrobe',0,3,26,92,()=>{
+  hs('wardrobe',56,8,25,54,()=>{
     if(state.stage<STAGE.GAP){inspect('衣柜','衣服和纸箱都在。你把能看到的位置都扫了一遍，没有人。<br><br>现在没有理由拆柜体。');return}
-    openModal(gapHTML(),true,true);
+    playWoodCreak();openModal(gapHTML(),true,true);
   },'衣柜');
 }
 function renderBathroom(){
-  hs('mat',39,69,48,28,()=>{addClue('wetmat');inspect('地垫','中间是湿的。不是整块返潮，而是两个分开的脚掌形潮痕。<br><br>你早上七点洗的澡，现在已经接近十一点。')},'地垫');
-  hs('sink',49,33,42,39,()=>{if(state.stage<STAGE.CHECK){inspect('洗手台','牙杯、洗面奶、剃须刀。乍看都在平常的位置。')}else{addClue('toothbrush');inspect('牙杯','杯子里有两支牙刷。<br><br>蓝色旧牙刷是你今天早上亲手扔进楼下垃圾桶的。')}} ,'洗手台');
-  hs('towels',66,65,30,30,()=>{if(state.stage>=STAGE.CHECK){addClue('towel');inspect('手巾','你习惯把手巾对折挂在架上。现在它被折成了三折，边角压得很平。<br><br>这种细节很小，却很难解释成风。')}else inspect('手巾','看上去很普通。')},'手巾');
-  hs('mirror',0,5,45,42,()=>{if(state.stage>=STAGE.CHECK){addClue('scent',true);inspect('镜子','镜面边缘有淡淡的水汽痕。凑近以后能闻到薄荷漱口水味。<br><br>你不用漱口水。')}else inspect('镜子','镜面上有一点已经散开的水汽。')},'镜子');
+  hs('mat',37,77,30,18,()=>{playWaterDrip();addClue('wetmat');inspect('地垫','中间是湿的。不是整块返潮，而是两个分开的脚掌形潮痕。<br><br>你早上七点洗的澡，现在已经接近十一点。')},'地垫');
+  hs('sink',20,39,26,31,()=>{if(state.stage<STAGE.CHECK){inspect('洗手台','牙杯、洗面奶、剃须刀。乍看都在平常的位置。')}else{addClue('toothbrush');inspect('牙杯','杯子里有两支牙刷。<br><br>蓝色旧牙刷是你今天早上亲手扔进楼下垃圾桶的。')}} ,'洗手台');
+  hs('towels',39,22,26,24,()=>{if(state.stage>=STAGE.CHECK){addClue('towel');inspect('手巾','你习惯把手巾对折挂在架上。现在它被折成了三折，边角压得很平。<br><br>这种细节很小，却很难解释成风。')}else inspect('手巾','看上去很普通。')},'手巾');
+  hs('mirror',13,12,18,28,()=>{if(state.stage>=STAGE.CHECK){addClue('scent',true);inspect('镜子','镜面边缘有淡淡的水汽痕。凑近以后能闻到薄荷漱口水味。<br><br>你不用漱口水。')}else inspect('镜子','镜面上有一点已经散开的水汽。')},'镜子');
 }
 function renderHallway(){
-  hs('704',8,18,34,65,()=>{addClue('maintenance');addClue('scratch',true);inspect('704房门','门上贴着“空置维修，请勿进入”。封条的右下角明显被揭开又压回去。<br><br>门框内侧还有几道新划痕，像有人反复用硬物顶过锁舌。')},'704房门');
-  hs('notice',51,10,28,40,()=>{addClue('shaftNotice');inspect('维修通知','七楼管线改造图写着：<b>704 与 705 共用一条旧检修竖井</b>。<br><br>竖井在两户卧室柜体后方封板处各有一个检修口。')},'维修通知');
-  hs('neighbor',73,49,26,45,()=>openModal(neighborHTML()),'703邻居房门');
-  hs('elevator',42,47,20,40,()=>inspect('电梯口','监控摄像头正对电梯门，但拍不到704和705门前。物业夜班电话一直占线。'),'电梯口');
+  hs('704',46,24,19,49,()=>{playMetal(false);addClue('maintenance');addClue('scratch',true);inspect('704房门','门上贴着“空置维修，请勿进入”。封条的右下角明显被揭开又压回去。<br><br>门框内侧还有几道新划痕，像有人反复用硬物顶过锁舌。')},'704房门');
+  hs('notice',37,18,12,24,()=>{addClue('shaftNotice');inspect('维修通知','七楼管线改造图贴在电表旁，写着：<b>704 与 705 共用一条旧检修竖井</b>。<br><br>竖井在两户卧室柜体后方封板处各有一个检修口。')},'维修通知');
+  hs('neighbor',82,22,18,61,()=>openModal(neighborHTML()),'703邻居房门');
+  hs('elevator',0,8,24,82,()=>inspect('电梯口','监控摄像头正对电梯门，但拍不到704和705门前。物业夜班电话一直占线。'),'电梯口');
 }
 
 function memoryPuzzleHTML(){
@@ -321,9 +354,9 @@ function hintListFor(stage,scene){
     [`${STAGE.CHECK}:bathroom`]:['卫生间里除了地垫，还有两处能说明“有人使用过”。','看牙杯和手巾。','检查洗手台和手巾。'],
     [`${STAGE.TIMELINE}:entry`]:['现在不需要继续搜屋子。先把时间排清楚。','手机“记录”里有三条系统记录，垃圾袋里还有21:36小票。','手机→记录→时间线。顺序是按分钟排，不需要猜。'],
     [`${STAGE.CHAIN}:entry`]:['现在回到“门是怎么回事”这个问题。','真正需要看的不是锁舌，而是只能从屋内操作的部件。','检查防盗链。'],
-    [`${STAGE.HALL}:hallway`]:['不要只问邻居。先把704本身和维修通知都看一遍。','需要：704门、维修通知、邻居至少两个问题。','三处都完成后才会进入“入口路径推理”，邻居不能直接跳关。'],
-    [`${STAGE.ROUTE}:hallway`]:['把“存在异常”和“支持路线”分开。','最直接的三条是：正门无撬痕、共用检修竖井、704封条/门框异常。','打开记事→整理入口路径，选择“704→竖井→705柜体后方”。'],
-    [`${STAGE.GAP}:bedroom`]:['别直接钻进去。先确认背板最近是否被动过。','先看螺丝和柜体下沿，再轻推背板。','夹层打开后，工程牌、收件纸、停留物都需要分别检查。'],
+    [`${STAGE.HALL}:hallway`]:['走廊里的价值不只在邻居口供。','先分别确认一扇门、墙上的维修信息，以及住户看到过什么。','检查704门、维修通知，并向703邻居至少问两个具体问题。'],
+    [`${STAGE.ROUTE}:hallway`]:['把“屋里有人待过”和“他从哪里进”分成两个问题。','支持入口路线的证据，应该直接涉及门锁、建筑结构和704本身。','打开记事→整理入口路径；最强的一组是正门无撬痕、共用检修竖井、704封条/门框异常。'],
+    [`${STAGE.GAP}:bedroom`]:['先找“最近被动过”的痕迹，不要一上来就拆。','金属固定件和积灰边缘，比柜门里的衣服更有用。','检查衣柜背板的螺丝和下沿，再轻推背板；打开后再分别看夹层物品。'],
     [`${STAGE.IDENTITY}:bedroom`]:['名字出现在纸上还不够。邻居说的是“帮你搬家的男人”。','你需要确认谁帮你搬过家，再把他和夹层纸张连起来。','手机看徐洲旧聊天；随后记事→人物身份链。'],
     [`${STAGE.IDENTITY}:entry`]:['回忆邻居原话：“帮你搬家的那个男的”。','旧聊天能确认徐洲帮你搬过家。','手机→消息→徐洲三个月前旧聊天，然后记事→人物身份链。'],
     [`${STAGE.FINAL}:entry`]:['最后一步不是猜“他现在在哪”，而是控制结论范围。','徐洲和路线的关系已经很强，但你没有实时看到他。','手机→消息→处理新消息，选择“具备进入条件，但无法确认此刻仍在屋内”。']
@@ -361,7 +394,7 @@ window.__finishNeighbor=()=>{if((state.flags.neighborTopics||[]).length<2){toast
 window.__route=()=>openModal(routeHTML(),true,true);
 window.__routeChoose=id=>{state.flags.routeChoice=id;safeSave();openModal(routeHTML(),true,true)};
 window.__routeFact=id=>{let arr=state.flags.routeFacts||[];if(arr.includes(id))arr=arr.filter(x=>x!==id);else if(arr.length<3)arr.push(id);else{toast('只选三条最直接的');return}state.flags.routeFacts=arr;safeSave();openModal(routeHTML(),true,true)};
-window.__routeCheck=()=>{const facts=[...(state.flags.routeFacts||[])].sort().join(',');if(state.flags.routeChoice!=='shaft'||facts!==['door','seal','shaft'].sort().join(',')){toast('路线或支持事实里还有越界/弱证据');return}state.flags.routeSolved=true;addClue('route');setStage(STAGE.GAP,'23:42');closeModal(true);go('bedroom');eventText('如果维修图没有错，705这一侧的检修口就在卧室柜体后方。<br>现在你终于有理由检查背板。')};
+window.__routeCheck=()=>{const facts=[...(state.flags.routeFacts||[])].sort().join(',');if(state.flags.routeChoice!=='shaft'||facts!==['door','seal','shaft'].sort().join(',')){toast('路线或支持事实里还有越界/弱证据');return}state.flags.routeSolved=true;addClue('route');setStage(STAGE.GAP,'23:42');closeModal(true);go('bedroom');eventText('这条路线至少在结构上成立。<br>回到屋里，看有没有能让它从“推测”变成“事实”的痕迹。')};
 
 window.__gapInspect=id=>{
   const done=state.flags.gapInspected||[];
@@ -376,7 +409,7 @@ window.__gapInspect=id=>{
   if(id==='cable')addClue('chargerCable',true,true);
   safeSave();openModal(gapHTML(),true,true);checkAutoAdvance();
 };
-window.__closeGap=()=>{closeModal(true);if(state.stage<STAGE.IDENTITY)setStage(STAGE.IDENTITY,'23:47');eventText('夹层里有“徐洲”这个名字。<br>先别让恐惧替你完成推理。你需要把他和邻居说的“帮你搬家的男人”连起来。')};
+window.__closeGap=()=>{closeModal(true);if(state.stage<STAGE.IDENTITY)setStage(STAGE.IDENTITY,'23:47');eventText('纸上出现了“徐洲”。<br>这个名字和今晚有关到什么程度，还要继续确认。')};
 
 window.__identity=()=>openModal(identityHTML(),true,true);
 window.__identityPerson=id=>{state.flags.identityPerson=id;safeSave();openModal(identityHTML(),true,true)};
@@ -421,7 +454,9 @@ window.__GAME_QA__={
     oldSaveMigration:typeof migrateOld==='function',
     hintHistory:!!state.hints,
     finalBoundary:clueDefs.finalBoundary.includes('没有'),
-    hallwayGate:objectives[STAGE.HALL].includes('三处'),
+    hallwayGate:!objectives[STAGE.HALL].includes('704')&&hintListFor(STAGE.HALL,'hallway').length===3,
+    ambientScheduling:typeof scheduleAmbientMoment==='function',
+    sceneCue:typeof playSceneEntryCue==='function',
     releaseBuild:true
   })
 };
@@ -456,5 +491,6 @@ async function runSelfQA(){
 }
 
 load();updateTitleButtons();
+window.__RUN_SELF_QA__=runSelfQA;
 if(new URLSearchParams(location.search).get('qa')==='1')setTimeout(runSelfQA,0);
 })();
