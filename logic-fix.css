@@ -1,0 +1,28 @@
+/* 2026-08 logic/narrative refinement: keep guidance available without repeating it on every frame. */
+.scene-caption > span{display:none!important}
+@media(min-width:761px){.scene-caption > p{display:none}.scene-caption{padding:18px;background:linear-gradient(0deg,#030507a8,#03050700)}}
+.logic-unverified-route{color:#73797a!important;letter-spacing:.02em}
+.logic-locked-evidence{opacity:.42!important;cursor:not-allowed!important}
+.logic-source-note{font-size:11px!important;color:#8e9495!important;line-height:1.7!important}
+
+/* Safe-area and low-height landscape hardening. */
+.topbar{padding-left:max(18px,env(safe-area-inset-left));padding-right:max(18px,env(safe-area-inset-right))}
+.quick-nav{padding-left:max(12px,env(safe-area-inset-left));padding-right:max(12px,env(safe-area-inset-right));padding-bottom:max(10px,env(safe-area-inset-bottom))}
+.toast{bottom:max(24px,calc(env(safe-area-inset-bottom) + 12px))}
+@media(max-width:760px){
+  .topbar{padding-left:max(10px,env(safe-area-inset-left));padding-right:max(10px,env(safe-area-inset-right))}
+  .modal{padding-top:max(8px,env(safe-area-inset-top));padding-right:max(8px,env(safe-area-inset-right));padding-bottom:max(8px,env(safe-area-inset-bottom));padding-left:max(8px,env(safe-area-inset-left))}
+  .choice-grid button,.modal-action,.evidence-btn,.tab-btn,.gap-item,.person-card{min-height:44px}
+}
+@media(orientation:landscape) and (max-height:520px) and (max-width:1000px){
+  .topbar{height:48px;flex-basis:48px}
+  .play-area{display:grid;grid-template-columns:minmax(0,1fr) 190px;grid-template-rows:minmax(0,1fr);gap:7px;min-height:0;align-content:stretch;padding:6px}
+  .scene-frame{height:100%;width:100%;aspect-ratio:auto;align-self:stretch}
+  .desktop-sidebar{display:flex;min-height:0;overflow:auto;gap:6px}
+  .sidebar-card{min-height:auto;padding:8px 10px}
+  .sidebar-card p{margin:5px 0;font-size:11px}.sidebar-card b{font-size:19px}
+  .quick-nav{padding-top:0;padding-bottom:max(5px,env(safe-area-inset-bottom))}
+  .quick-nav button{padding:6px 9px}
+  .event-text{top:3%;right:2%;width:min(360px,60%);padding:9px 11px;font-size:11px;line-height:1.6}
+  .modal-card{max-height:94vh}
+}

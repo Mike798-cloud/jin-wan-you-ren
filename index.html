@@ -8,6 +8,7 @@
   <title>今晚有人进过我家</title>
   <link rel="stylesheet" href="style.css" />
   <link rel="stylesheet" href="paywall.css" />
+  <link rel="stylesheet" href="logic-fix.css" />
 </head>
 <body>
   <div id="app">
@@ -26,7 +27,6 @@
         <p class="small">建议佩戴耳机 · 无跳脸惊吓 · 首次完整调查约 40–60 分钟</p>
       </div>
     </section>
-
     <main id="game" class="game hidden" aria-live="polite">
       <header class="topbar">
         <div class="scene-meta">
@@ -43,7 +43,6 @@
           <button data-panel="settings" aria-label="设置">设置</button>
         </div>
       </header>
-
       <section class="play-area">
         <div id="sceneFrame" class="scene-frame" tabindex="0" aria-label="当前场景，可点击画面中的物体调查">
           <img id="sceneImage" alt="当前场景" draggable="false" />
@@ -56,7 +55,6 @@
             <span>画面中的可调查位置不会高亮。没有必要把每个角落都点一遍。</span>
           </div>
         </div>
-
         <aside id="desktopSidebar" class="desktop-sidebar">
           <div class="sidebar-card objective-card">
             <span class="label">现在要做的事</span>
@@ -74,7 +72,6 @@
           </div>
         </aside>
       </section>
-
       <nav id="quickNav" class="quick-nav" aria-label="房间导航"></nav>
     </main>
 
@@ -84,10 +81,10 @@
         <div id="modalContent"></div>
       </div>
     </div>
-
     <div id="toast" class="toast hidden" aria-live="polite"></div>
   </div>
   <script src="game.js"></script>
   <script src="paywall.js"></script>
+  <script src="logic-fix.js"></script>
 </body>
 </html>
