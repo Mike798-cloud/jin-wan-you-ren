@@ -1,4 +1,4 @@
-/* 2026-08-16c — spoiler-light narrative + grounded UI + persistent 2D position map */
+/* 2026-08-17e — motive/logic hardening + spoiler-light narrative + grounded UI + persistent 2D map */
 
 /* Keep the scene itself primary; no permanent developer narration over the image. */
 .scene-caption > p{display:none!important}
@@ -66,3 +66,12 @@ body{font-family:"Microsoft YaHei","PingFang SC","Noto Sans CJK SC",Arial,sans-s
 @media(orientation:landscape) and (max-height:520px) and (max-width:1000px){
   .topbar{height:48px;flex-basis:48px}.play-area{display:grid;grid-template-columns:minmax(0,1fr) 190px;grid-template-rows:minmax(0,1fr);gap:7px;min-height:0;align-content:stretch;padding:6px}.scene-frame{height:100%;width:100%;aspect-ratio:auto;align-self:stretch}.desktop-sidebar{display:flex;min-height:0;overflow:auto;gap:6px}.sidebar-card{min-height:auto!important;padding:8px 10px!important}.sidebar-card p{margin:5px 0;font-size:11px}.sidebar-card b{font-size:19px}.logic-map-card{display:none!important}.quick-nav{padding-top:0;padding-bottom:max(5px,env(safe-area-inset-bottom))}.quick-nav button{padding:6px 9px}.event-text{top:3%;right:2%;width:min(360px,60%);padding:9px 11px;font-size:11px;line-height:1.6}.modal-card{max-height:94vh}
 }
+
+/* Evidence that supports motive without turning into an exposition card. */
+.logic-schedule-note{
+  margin:10px 0 14px;padding:11px 12px;border:1px solid #ffffff14;border-left:2px solid #8e866f;
+  background:#090d0f;color:#b9b9b4;font-size:12px;line-height:1.75
+}
+.logic-schedule-note b{display:block;margin-bottom:5px;color:#d6d1c5;font-weight:500}
+.logic-schedule-note p{margin:4px 0!important}
+.logic-schedule-note span{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;color:#c8c3b7;letter-spacing:.03em}
