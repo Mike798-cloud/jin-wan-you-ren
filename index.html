@@ -8,7 +8,7 @@
   <title>今晚有人进过我家</title>
   <link rel="stylesheet" href="style.css" />
   <link rel="stylesheet" href="paywall.css" />
-  <link rel="stylesheet" href="logic-fix.css?v=20260817f" />
+  <link rel="stylesheet" href="logic-fix.css?v=20260817g" />
 </head>
 <body>
   <div id="app">
@@ -17,7 +17,7 @@
       <div class="title-card">
         <p class="eyebrow">一个普通人的夜晚 · 22:48</p>
         <h1>今晚有人<br><span>进过我家</span></h1>
-        <p class="lead">门锁没有坏。钥匙还在你手里。<br>但玄关那双拖鞋，早上绝不是这么放的。</p>
+        <p class="lead">门锁没有明显损坏。你正常打开了门。<br>屋里有几处细节，让你停下来重新看了一遍。</p>
         <div class="title-actions">
           <button id="startBtn" class="primary">开门回家</button>
           <button id="continueBtn" class="ghost hidden">继续上次调查</button>
@@ -61,9 +61,9 @@
             <p id="objectiveSide"></p>
           </div>
           <div class="sidebar-card evidence-card">
-            <span class="label">已经确认</span>
-            <p><b id="clueCount">0</b> 条有效信息</p>
-            <small id="dangerText">也许只是你记错了。</small>
+            <span class="label">已记录</span>
+            <p><b id="clueCount">0</b> 条记录</p>
+            <small id="dangerText">记录会自动保存在这台设备上。</small>
           </div>
           <div class="sidebar-card progress-card">
             <span class="label">今晚的调查</span>
@@ -84,6 +84,6 @@
   </div>
   <script src="game.js"></script>
   <script src="paywall.js"></script>
-  <script src="logic-fix.js?v=20260817f"></script>
+  <script src="logic-fix.js?v=20260817g"></script>
 </body>
 </html>

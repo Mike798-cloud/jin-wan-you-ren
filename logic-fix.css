@@ -1,4 +1,4 @@
-/* 2026-08-17f — motive/logic hardening + spoiler-light narrative + grounded UI + persistent 2D map */
+/* 2026-08-17g — motive/logic hardening + spoiler-light narrative + grounded UI + persistent 2D map */
 
 /* Keep the scene itself primary; no permanent developer narration over the image. */
 .scene-caption > p{display:none!important}
@@ -76,7 +76,7 @@ body{font-family:"Microsoft YaHei","PingFang SC","Noto Sans CJK SC",Arial,sans-s
 .logic-schedule-note p{margin:4px 0!important}
 .logic-schedule-note span{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;color:#c8c3b7;letter-spacing:.03em}
 
-/* 2026-08-17f — visual evidence consistency */
+/* 2026-08-17g — visual evidence consistency */
 .logic-memory-card .compare-layout.logic-single-memory{display:block!important;max-width:640px;margin-left:auto;margin-right:auto}
 .logic-memory-card .compare-layout.logic-single-memory .compare-shot{width:100%!important;max-width:none!important}
 
@@ -86,3 +86,13 @@ body{font-family:"Microsoft YaHei","PingFang SC","Noto Sans CJK SC",Arial,sans-s
 .logic-chat-search input{min-width:0;height:42px;border:1px solid #ffffff20;background:#070a0c;color:#e2dfd6;padding:0 12px;font:inherit;outline:none}
 .logic-chat-search input:focus{border-color:#8b806570}
 .logic-chat-search .modal-action{margin:0!important;min-width:86px}
+
+
+/* 2026-08-17g — final consistency pass */
+.logic-map-card>.label{letter-spacing:.04em}
+.logic-hall-row span:first-child{border-color:#8b806533}
+.logic-extra-record{border-left:2px solid #7e765f55;padding-left:8px}
+.logic-chat-search+.muted{color:#6f7779!important}
+@media(max-width:760px){
+  .logic-chat-search{grid-template-columns:1fr}.logic-chat-search .modal-action{width:100%}
+}
