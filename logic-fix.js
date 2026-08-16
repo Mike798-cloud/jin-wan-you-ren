@@ -36,6 +36,10 @@ function normalizeStoredSave(){
   if(!Number.isFinite(Number(raw.stage))){raw.stage=0;changed=true}else{
     const n=Math.max(0,Math.min(STAGE.END,Number(raw.stage)));if(n!==raw.stage){raw.stage=n;changed=true}
   }
+  const validEndings=['leave','ask','trap','secret'];
+  if(raw.ending!=null&&!validEndings.includes(raw.ending)){raw.ending=null;changed=true}
+  if(raw.ending&&raw.stage!==STAGE.END){raw.stage=STAGE.END;changed=true}
+  if(!raw.ending&&raw.stage===STAGE.END){raw.stage=STAGE.FINAL;raw.time='23:52';changed=true}
   if(!raw.visited.includes('entry')){raw.visited.unshift('entry');changed=true}
   raw.visited=raw.visited.filter((v,i,a)=>SCENES.includes(v)&&a.indexOf(v)===i);
   raw.clues=raw.clues.filter((v,i,a)=>typeof v==='string'&&a.indexOf(v)===i);
@@ -83,6 +87,7 @@ function polishHUD(){
   setText($('#stageLabel'),HUD.stage[st]);
   setText($('#progressText'),HUD.progress[st]);
   setText($('#dangerText'),'记录会自动保存在这台设备上。');
+  const evCard=$('.evidence-card');if(evCard){setText(evCard.querySelector('.label'),'已记录');const ep=evCard.querySelector('p');if(ep){[...ep.childNodes].filter(n=>n.nodeType===3).forEach(n=>{if(n.nodeValue.includes('条有效信息'))n.nodeValue=n.nodeValue.replace('条有效信息','条记录')})}}
   const caption=$('.scene-caption > span');
   setText(caption,'画面不会标出可调查点。');
   polishTitleButtons();
@@ -92,6 +97,7 @@ function polishHUD(){
 
 function polishTitleButtons(){
   const c=$('#continueBtn');if(c)c.classList.toggle('hidden',!hasUnfinishedSave());
+  const lead=document.querySelector('#titleScreen .title-card .lead');setHTML(lead,'门锁没有坏。钥匙还在你手里。<br>玄关那双拖鞋，让你在门口停了一下。');
 }
 
 function sidebarMapHTML(){
@@ -103,6 +109,7 @@ function sidebarMapHTML(){
     <div class="logic-room entry" data-room="entry"><span>玄关 / 厨房</span><i></i></div>
   </div>
   <div class="logic-hall-row" aria-label="七楼走廊示意"><span data-flat="703">703</span><span data-flat="704">704</span><span data-flat="705">705</span></div>
+  <div class="logic-hall-current" aria-live="polite"></div>
   <p class="logic-map-note"></p>`;
 }
 function ensureSidebarMap(){
@@ -115,7 +122,8 @@ function updateSidebarMap(){
   const s=state(),scene=$('#game')?.dataset.scene||s.scene||'entry',stage=Number(s.stage)||0,clues=isArr(s.clues)?s.clues:[];
   card.querySelectorAll('.logic-room').forEach(el=>el.classList.toggle('current',el.dataset.room===scene));
   const hall=card.querySelector('.logic-hall-row');
-  if(hall){hall.classList.toggle('shown',stage>=STAGE.HALL);hall.querySelectorAll('span').forEach(x=>x.classList.remove('current'));if(scene==='hallway')hall.querySelector('[data-flat="705"]')?.classList.add('current')}
+  if(hall){hall.classList.toggle('shown',stage>=STAGE.HALL);hall.querySelectorAll('span').forEach(x=>x.classList.remove('current'))}
+  const hallCurrent=card.querySelector('.logic-hall-current');if(hallCurrent){hallCurrent.classList.toggle('shown',stage>=STAGE.HALL&&scene==='hallway');setText(hallCurrent,stage>=STAGE.HALL&&scene==='hallway'?'● 当前：七楼公共走廊':'')}
   const note=card.querySelector('.logic-map-note');
   if(stage<STAGE.HALL)setText(note,'');
   else if(clues.includes('shaftNotice'))setText(note,'维修通知：704 与 705 之间有旧管线检修夹道。');
@@ -142,12 +150,12 @@ function polishInspection(root,title){
     '茶几和沙发':'你把靠垫拿起来翻到背面。拉链面朝外；你平时会把这一面压在里侧。',
     '客厅窗边':'你扣了两下窗锁。锁扣仍咬合，窗框没有新鲜擦痕；窗外墙面也没有平台或外接踏脚。',
     '沙发':'你拿起靠垫看了一眼背面。拉链朝外；你平时会把拉链面压到里侧。',
-    '床头插座':'你弯腰看床头柜后面。充电线插在右侧墙插，插头被柜角挤着。你一直用左侧插口，因为右侧会被柜体压住。',
+    '床头插座':'你弯腰看床头柜后面。充电线插在右侧墙插，插头被柜角挤着。你一直用左侧插口，因为右侧会被柜体压住。床头抽屉里那部换下来的旧手机还在。',
     '衣柜':'你拉开柜门。衣服、纸箱和收纳袋都在柜里。',
     '地垫':'你蹲下按了按地垫。中间有两处彼此分开的潮湿区域，摸上去还有凉意。',
-    '洗手台':'牙杯、洗面奶和剃须刀摆在台面上。',
+    '洗手台':'牙杯、牙膏、洁面用品和洗手液都在台面这一侧。',
     '手巾':'手巾挂在架上。',
-    '镜子':'镜面边缘有一点已经散开的水汽。'
+    '镜子':'镜面上有几处普通水点，已经干得差不多。'
   };
   if(title==='窗帘'||title==='卧室窗帘'){
     if(st>=STAGE.CHECK)setText(p,'你走到窗边，沿轨道把帘布捋了一遍。右侧已经推到轨道尽头。你早上给植物留光时，只会收到大约半扇窗宽的位置。');
@@ -155,19 +163,19 @@ function polishInspection(root,title){
     return;
   }
   if(title==='垃圾桶'){
-    setHTML(p,'你蹲下来，把上层纸巾拨开。下面压着两个同款一次性咖啡杯；你今天没有买咖啡回家。<br><br>再往下是一张揉皱的便利店小票：<b>21:36</b>。');return;
+    setHTML(p,'你蹲下来，把上层纸巾拨开。下面压着两个同款一次性咖啡杯：一个杯壁已经干透，另一个杯底还留着一点冷掉的咖啡；你今天没有买咖啡回家。<br><br>再往下是一张揉皱的便利店小票：<b>21:36</b>。');return;
   }
   if(title==='牙杯'){
-    setHTML(p,'你把牙杯拿到灯下。里面有两支牙刷。<br><br>蓝色旧牙刷是你今天早上换下来、收进洗手台下方柜子里的那支。');return;
+    setHTML(p,'你把牙杯拿到灯下。里面是一支新牙刷和一支蓝色旧牙刷。<br><br>蓝色这支是你今天早上换下来、收进洗手台下方柜子里的。');return;
   }
   if(title==='手巾'&&st>=STAGE.CHECK){
-    setText(p,'你把手巾取下来。布面留下三道等距折线，重新挂回去时能看出它被折成三折；你平时只对折一次。');return;
+    setText(p,'你把左侧浅色手巾取下来。布面留下三道等距折线，重新挂回去时能看出它被折成三折；你平时只对折一次。');return;
   }
   if(title==='镜子'&&st>=STAGE.CHECK){
-    setHTML(p,'你靠近镜面。边缘有散开的水汽印，旁边残留淡淡的薄荷漱口水味。<br><br>你不用漱口水。');return;
+    setHTML(p,'你靠近洗手台和镜柜。镜面边缘有散开的水汽印，空气里还留着很淡的薄荷味。<br><br>你家里没有这种味道的漱口水。');return;
   }
   if(title==='床头相框'){
-    setHTML(p,'你把搬家合照从书下面抽出来。徐洲站在你身后，钥匙圈上挂着一枚绿色硬塑料牌。夹道里那枚也是相近的绿色硬塑料牌。');return;
+    setHTML(p,'你把搬家合照从书下面抽出来。徐洲站在你身后，钥匙圈上挂着一枚绿色硬塑料标签。夹道里那枚标签的颜色和外形相近；照片看不清编号。');return;
   }
   if(text[title])setText(p,text[title]);
 }
@@ -199,8 +207,13 @@ function polishMemory(root){
   const p=[...root.querySelectorAll('p.muted')].find(x=>x.textContent.includes('照片没有拍到'));
   if(p)p.remove();
   const card=root.closest('.modal-card');if(card)card.classList.add('logic-memory-card');
+  const shots=[...root.querySelectorAll('.compare-shot')];
+  if(shots.length>1)shots.slice(1).forEach(x=>x.remove());
+  const layout=root.querySelector('.compare-layout');if(layout)layout.classList.add('logic-single-memory');
+  const firstLabel=root.querySelector('.compare-shot .shot-label');setText(firstLabel,'今早 07:12 · 相册原图');
   const intro=root.querySelector(':scope > p:not(.muted)');
-  setHTML(intro,'看两张画面，选出<b>两条</b>能直接从07:12照片里确认的事实。');
+  setHTML(intro,'只看07:12这张照片，选出<b>两条</b>能由照片本身直接确认的事实。今晚拖鞋的细节以刚才近看时记下的状态为准。');
+  [...root.querySelectorAll('.choice-grid button')].forEach(btn=>{if(btn.textContent.includes('两只拖鞋当时并排收在鞋柜下'))setText(btn,'照片边缘能确认：07:12时两只拖鞋并排收在鞋柜下。')});
 }
 function polishTimeline(root,title){
   const p=root.querySelector(':scope > p');if(!p)return;
@@ -211,7 +224,7 @@ function polishContact(root){
   const intro=root.querySelector(':scope > p');
   setText(intro,'周先生接得很快。背景里有电视新闻和家人说话的声音。');
   const msg=byText(root,'.message.them','704一直空着');
-  if(msg)setText(msg,'周先生：704一直空着。物业这阵子在改旧管线，白天有人上七楼施工。具体改哪里我没问。');
+  if(msg)setText(msg,'周先生：704一直空着等整改，工程不是每天都进屋。今天物业白天只在七楼公共电表箱和走廊管线处做了半天，704室内没人施工。');
   const done=[...root.querySelectorAll('button')].find(b=>(b.getAttribute('onclick')||'').includes('__finishContact'));
   setText(done,'挂断电话');
 }
@@ -219,27 +232,24 @@ function xuHistoryUnlocked(){
   const s=state(),clues=isArr(s.clues)?s.clues:[];
   return clues.includes('delivery')||clues.includes('oldChat');
 }
+function chatSearchHTML(){
+  return `<h2>搜索聊天记录</h2><p>手机里有不少旧消息。输入姓名或关键词。</p><div class="logic-chat-search"><input id="logicChatSearchInput" type="search" autocomplete="off" placeholder="姓名 / 关键词" aria-label="搜索聊天记录"><button class="modal-action" onclick="window.__logicSearchChat()">搜索</button></div><p class="muted">这只是你自己的聊天记录，什么时候搜索由你决定。</p>`;
+}
 function polishPhone(root){
   const recent=byText(root,'.message.them.old','徐洲 · 上周四');
   if(recent)setText(recent,'徐洲 · 上周四\n周五那版表我替你收尾。附件我放群里了，明早再看。');
-  const historyBtn=byText(root,'.evidence-btn','徐洲 · 三个月前')||byText(root,'.evidence-btn','搜索：徐洲');
+  const historyBtn=byText(root,'.evidence-btn','徐洲 · 三个月前')||byText(root,'.evidence-btn','搜索：徐洲')||byText(root,'.evidence-btn','搜索旧聊天');
   if(historyBtn){
     const h=historyBtn.previousElementSibling;
-    const d=h&&h.previousElementSibling;
-    if(!xuHistoryUnlocked()){
-      historyBtn.classList.add('logic-history-locked');
-      if(h&&h.tagName==='H3')h.classList.add('logic-history-locked');
-      if(d&&d.classList.contains('divider'))d.classList.add('logic-history-locked');
-    }else{
-      historyBtn.classList.remove('logic-history-locked');
-      setText(historyBtn,hasClue('oldChat')?'搜索：徐洲（已核对）':'搜索：徐洲');
-      if(h&&h.tagName==='H3'){h.classList.remove('logic-history-locked');setText(h,'搜索聊天')}
-      if(d)d.classList.remove('logic-history-locked');
-    }
+    if(h&&h.tagName==='H3')setText(h,'搜索聊天');
+    historyBtn.classList.remove('logic-history-locked');
+    setText(historyBtn,xuHistoryUnlocked()?(hasClue('oldChat')?'搜索：徐洲（已核对）':'搜索：徐洲'):'搜索旧聊天');
   }
   root.querySelector('.logic-phone-context')?.remove();
 }
-function hasClue(id){const s=state();return isArr(s.clues)&&s.clues.includes(id)}
+function polishChatSearch(root){
+  const input=root.querySelector('#logicChatSearchInput');if(input&&!input.dataset.logicFocus){input.dataset.logicFocus='1';setTimeout(()=>input.focus(),40)}
+}
 function polishOldChat(root){
   if(root.dataset.logicOldChat==='1')return;
   root.dataset.logicOldChat='1';
@@ -255,6 +265,7 @@ function polishOldChat(root){
     </div>
     <button class="modal-action" onclick="window.__phone('messages')">返回消息</button>`);
 }
+function hasClue(id){const s=state();return isArr(s.clues)&&s.clues.includes(id)}
 function polishNotes(root){
   [...root.querySelectorAll('.optional-group .clue small')].forEach(x=>x.remove());
   const groupNames=new Map([['生活异常','生活细节'],['客观记录','时间与外部记录'],['建筑与入口','建筑与通道'],['人物与停留','人物与现场'],['证据边界','最后判断']]);
@@ -262,22 +273,27 @@ function polishNotes(root){
   const t=root.querySelector('.optional-group .clue-group-title');
   if(t&&!t.dataset.logic){t.dataset.logic='1';const node=[...t.childNodes].find(n=>n.nodeType===3);if(node)node.textContent='额外观察';}
   const optionalReplace=new Map([
-    ['搬家合照里，徐洲腰间挂着同款绿色工程牌','搬家合照里，徐洲钥匙圈上挂着一枚相近的绿色硬塑料牌'],
+    ['搬家合照里，徐洲腰间挂着同款绿色工程牌','搬家合照里，徐洲钥匙圈上挂着一枚绿色硬塑料钥匙标签；只能确认外观相近'],
     ['夹层里有与你床头同型号但颜色不同的旧充电线','检修夹道里有一根与床头接口规格相同、线皮颜色不同的旧充电线']
   ]);
   [...root.querySelectorAll('.optional-group .clue')].forEach(el=>{const tx=el.textContent.trim();if(optionalReplace.has(tx))setText(el,optionalReplace.get(tx))});
   const empty=[...root.querySelectorAll('p.muted')].find(x=>x.textContent.includes('还没有确认任何有效信息'));if(empty)setText(empty,'还没有记下任何内容。');
   const replacements=new Map([
     ['防盗链在你进门后仍从屋内扣着','回家时垂下的防盗链，后来处于扣合状态'],
+    ['垃圾桶里有两个同款一次性咖啡杯','垃圾袋里有两个同款一次性咖啡杯；一个已经干透，另一个杯底仍有少量冷咖啡'],
+    ['房东确认今天没有进入705','房东称自己今天没有进入705'],
+    ['备用钥匙一直在房东手里','房东称备用钥匙仍在自己手里'],
+    ['704今天确实处于空置维修状态','房东称704目前空置等整改；今天施工只在七楼公共区域，没有进入704室内'],
+    ['703邻居见过帮你搬家的男人从704出来','703邻居称最近见过一个她认作“帮你搬家的男人”的人从704出来'],
     ['21:36屋内痕迹与22:18仍在公司形成时间矛盾','21:36便利店小票后来出现在705垃圾袋里；22:18你才离开公司'],
     ['卫生间地垫在深夜仍是新鲜潮湿','卫生间地垫中间有两处彼此分开的潮湿区域'],
     ['早上扔掉的旧牙刷重新出现在牙杯里','早上收进洗手台柜里的旧牙刷重新回到牙杯'],
     ['维修通知确认704与705共用旧检修竖井','维修通知标明704与705之间保留一段旧管线检修夹道'],
     ['现有证据更支持“704→检修竖井→705柜体后方”','优先回705核对与旧管线检修夹道相邻的柜体一侧'],
     ['衣柜背板后确实连着维修夹层','衣柜背板后实际连通一段横向旧管线检修夹道'],
-    ['夹层内有绿色物业工程钥匙牌','检修夹道内有一枚印着旧物业工程编号的绿色钥匙牌'],
+    ['夹层内有绿色物业工程钥匙牌','检修夹道内有一枚印着旧物业工程编号的绿色钥匙标签'],
     ['夹层废纸的收件人写着“徐洲”','检修夹道里的收件纸写着“徐洲”'],
-    ['夹层里有薄毯、水和充电线，说明有人停留过','检修夹道里有薄毯、水和充电设备；旁边便签写着“705”和几个夜间时段'],
+    ['夹层里有薄毯、水和充电线，说明有人停留过','检修夹道的检修凹位里有折叠坐垫、水和充电设备；旁边便签写着“705”和几个夜间时段'],
     ['旧聊天确认徐洲帮你搬过家，也知道你的工作作息','旧聊天确认徐洲帮你搬过家；他提过曾在这片物业做短期工程协助，也问过你通常几点下班'],
     ['邻居、旧聊天与夹层废纸共同把徐洲和704路线连起来','邻居、旧聊天与检修夹道收件纸共同把徐洲和704行动连起来']
   ]);
@@ -299,7 +315,7 @@ function polishRoute(root){
   setText(fact,'维修通知标明704与705之间保留旧管线检修夹道');
   [...root.querySelectorAll('.evidence-btn')].forEach(btn=>{
     const click=btn.getAttribute('onclick')||'';
-    if(click.includes("__routeFact('door')"))setText(btn,'703邻居最近见过帮你搬家的男人从704出来');
+    if(click.includes("__routeFact('door')"))setText(btn,'703邻居称最近见过她认作“帮你搬家的男人”的人从704出来');
     if(click.includes("__routeFact('seal')"))setText(btn,'704封条有揭开重贴痕迹，门框锁舌处有新划痕');
     if(click.includes("__routeFact('key')"))setText(btn,'房东说备用钥匙仍在自己手里');
   });
@@ -308,16 +324,20 @@ function polishRoute(root){
 function polishGap(root){
   const s=state(),doneIds=(s.flags&&isArr(s.flags.gapInspected))?s.flags.gapInspected:[];
   const p=root.querySelector(':scope > p');
-  setText(p,'陈阿姨把703的门开着，人在走廊。705入户门也没有关。你只从卧室这一侧检查背板。');
+  setText(p,'陈阿姨把703的门开着，站在走廊。你让她在705门外等着，自己只进卧室检查柜体这一侧；入户门不反锁。');
   const result=root.querySelector('.result-warn p');
-  if(result)setText(result,'背板后不是实墙，而是一段横向旧管线检修夹道，宽度只够成年人侧身通过。你留在卧室这一侧，不把身体探进去；陈阿姨还在门外。');
+  if(result)setText(result,'背板只向外松开几厘米。手电光从缝里照进去：后面不是实墙，而是一段横向旧管线检修夹道。大部分位置只够成年人侧身通过，靠管线检修口的位置向内凹出一小块能蹲坐的空间。你留在卧室这一侧，不把身体探进去；陈阿姨还在门外。');
+  const screw=[...root.querySelectorAll('.gap-item')].find(b=>b.textContent.includes('固定螺丝'));
+  if(screw){setText(screw.querySelector('b'),'一字槽固定螺丝');setText(screw.querySelector('p'),'两颗螺丝都没有完全坐紧；看螺丝头和板边是否有近期摩擦痕迹')}
+  const tap=[...root.querySelectorAll('.gap-item')].find(b=>(b.getAttribute('onclick')||'').includes("__gapInspect('tap')"));
+  if(tap){setText(tap.querySelector('b'),'松开一条缝');setText(tap.querySelector('p'),doneIds.includes('screws')&&doneIds.includes('dust')?'用钥匙边转松已经松动的一字槽螺丝，只把背板向外移开几厘米':'先看固定件和积灰边缘')}
   const tag=[...root.querySelectorAll('.gap-item')].find(b=>b.textContent.includes('绿色工程钥匙牌'));
-  if(tag){setText(tag.querySelector('b'),'旧物业绿色钥匙牌');setText(tag.querySelector('p'),'表面印着已经磨旧的物业工程编号')}
+  if(tag){setText(tag.querySelector('b'),'旧物业工程钥匙标签');setText(tag.querySelector('p'),'绿色硬塑料标签，表面印着已经磨旧的物业工程编号；这里只看到标签本身')}
   const cable=[...root.querySelectorAll('.gap-item')].find(b=>b.textContent.includes('旧充电线'));
   if(cable)setText(cable.querySelector('p'),'接口规格和你床头那根相同，线皮颜色不同');
-  const nest=[...root.querySelectorAll('.gap-item')].find(b=>b.textContent.includes('薄毯、水瓶和充电宝'));
+  const nest=[...root.querySelectorAll('.gap-item')].find(b=>b.textContent.includes('薄毯、水瓶和充电宝')||b.textContent.includes('折叠坐垫'));
   if(nest){
-    const np=nest.querySelector('p');setText(np,'旁边压着一张折过几次的小便签');
+    const nb=nest.querySelector('b');setText(nb,'折叠坐垫、水瓶和充电宝');const np=nest.querySelector('p');setText(np,'放在管线旁稍宽一点的检修凹位里；坐垫下面压着一张折过几次的小便签');
   }
   const paper=[...root.querySelectorAll('.gap-item')].find(b=>b.textContent.includes('揉皱的快递/收件纸'));
   if(paper){
@@ -325,7 +345,7 @@ function polishGap(root){
   }
   if(doneIds.includes('nest')&&!root.querySelector('.logic-schedule-note')){
     const note=document.createElement('div');note.className='logic-schedule-note';
-    note.innerHTML='<b>薄毯旁的便签</b><p>纸上只有几行：<br><span>705　周一 22:40后</span><br><span>周三 22:30后</span><br><span>周五　不定</span></p>';
+    note.innerHTML='<b>折叠坐垫下面的便签</b><p>纸上只有几行：<br><span>705　周一 22:40后</span><br><span>周三 22:30后</span><br><span>周五　不定</span></p>';
     const board=nest?.closest('.gap-board');if(board)board.insertAdjacentElement('afterend',note);
   }
   const close=[...root.querySelectorAll('button')].find(b=>(b.getAttribute('onclick')||'').includes('__closeGap'));
@@ -342,9 +362,9 @@ function polishIdentity(root){
   });
   [...root.querySelectorAll('.evidence-btn')].forEach(btn=>{
     const click=btn.getAttribute('onclick')||'';
-    if(click.includes("__identityFact('neighbor')"))setText(btn,'邻居：最近见过帮你搬家的男人从704出来');
+    if(click.includes("__identityFact('neighbor')"))setText(btn,'邻居：称最近见过她认作“帮你搬家的男人”的人从704出来');
     if(click.includes("__identityFact('delivery')"))setText(btn,'检修夹道收件联：收件人写着“徐洲”');
-    if(click.includes("__identityFact('tag')"))setText(btn,'检修夹道：旧物业工程编号绿色钥匙牌');
+    if(click.includes("__identityFact('tag')"))setText(btn,'检修夹道：印有旧物业工程编号的绿色钥匙标签');
     if(click.includes("__identityFact('key')"))setText(btn,'房东：备用钥匙仍在自己手里');
     if(click.includes("__identityFact('receipt')"))setText(btn,'21:36便利店小票后来出现在705垃圾袋里');
   });
@@ -370,12 +390,12 @@ function polishHint(root,title){
 }
 
 function polishEndingChoice(root){
-  const p=root.querySelector(':scope > p');setText(p,'23:54。手机、钥匙和证件都在身上。705的门保持敞开，陈阿姨站在703门口。');
+  const p=root.querySelector(':scope > p');setText(p,'23:54。手机、钥匙和证件都在身上。你已经回到公共走廊，陈阿姨站在703门口。');
   const leave=[...root.querySelectorAll('button')].find(b=>(b.getAttribute('onclick')||'').includes("__end('leave')"));
   const ask=[...root.querySelectorAll('button')].find(b=>(b.getAttribute('onclick')||'').includes("__end('ask')"));
   const trap=[...root.querySelectorAll('button')].find(b=>(b.getAttribute('onclick')||'').includes("__end('trap')"));
   if(leave){const span=leave.querySelector('.muted');setText(span,'和陈阿姨一起下楼，到明亮处报警。')}
-  if(ask){const span=ask.querySelector('.muted');setText(span,'先下楼，再把工程牌和收件纸照片发给他。')}
+  if(ask){const span=ask.querySelector('.muted');setText(span,'先下楼，再把绿色标签和收件纸照片发给他。')}
   if(trap){const span=trap.querySelector('.muted');setText(span,'只回卧室几十秒放好旧手机，随后立刻离开。')}
   const secret=[...root.querySelectorAll('button')].find(b=>b.textContent.includes('隐藏选择'));
   if(secret){
@@ -403,14 +423,14 @@ function polishEnding(root){
   const body=ps[2];
   const c=code?.textContent.trim();
   if(c==='THE SAFE DISTANCE'){
-    setHTML(body,'23:58，你和陈阿姨一起下到一楼，在两条街外的24小时便利店里报警。<br><br>警察和物业进入704后，在旧管线检修夹道里找到薄毯、充电宝、一次性杯子、旧工程钥匙，以及那张写着“705”和几个夜间时段的便签。<br><br>徐洲的手机关机。第二天公司说他没有来上班。');
+    setHTML(body,'23:58，你和陈阿姨一起下到一楼，在两条街外的24小时便利店里报警。<br><br>警察和物业进入704后，在旧管线检修夹道的检修凹位里找到折叠坐垫、水瓶、充电宝、一次性杯子、旧物业工程标签，以及那张写着“705”和几个夜间时段的便签。<br><br>徐洲的手机关机。第二天公司说他没有来上班。');
   }else if(c==='THE QUESTION'){
-    setHTML(body,'你先和陈阿姨下了楼。到了便利店门口，你才把工程牌和收件纸拍给徐洲。<br><br>对方显示“正在输入”很久。<br><br>最后只来了一句：<br><b>“门锁没坏吧？”</b><br><br>你没有回复，把聊天截图和今晚的记录一起交给接警员。');
+    setHTML(body,'你先和陈阿姨下了楼。到了便利店门口，你才把绿色标签和收件纸拍给徐洲。<br><br>对方显示“正在输入”很久。<br><br>最后只来了一句：<br><b>“门锁没坏吧？”</b><br><br>你没有回复，把聊天截图和今晚的记录一起交给接警员。');
   }else if(c==='THE RECORDING'){
     setHTML(body,'陈阿姨站在705门口替你看着走廊。你只回卧室几十秒，把旧手机架在书架上，镜头朝向衣柜，然后和她一起下楼。<br><br>凌晨01:17，录像里的衣柜背板从里面慢慢推开。一个人只露出半边肩膀，停了很久。<br><br>他似乎在听。<br><br>镜头外的旧闹钟突然响起，那个人立刻退回黑暗。<br><br>录像没有拍清脸，却完整拍到了进入方式。第二天，704和705之间的旧管线检修夹道被警方封存。');
   }else if(c==='YOU WERE CHOSEN'||c==='THE ROUTINE'){
     setText(code,'THE ROUTINE');setText(title,'隐藏结局 · 作息表');
-    setHTML(body,'你和陈阿姨先下了楼，把今晚拍下的照片、聊天记录和时间记录一起交给警方。你没有再回705收拾。<br><br>等候时，你重新翻了一遍另外几条细节：21:36的小票、搬家照里徐洲钥匙圈上的绿色硬塑料牌、704门框的新划痕、卫生间陌生的薄荷味、夹道里的旧充电线，以及那张只写着“705”和几个夜间时段的便签。<br><br>三个月前，徐洲把这套房源发给你，也来帮过你搬家。旧聊天里，他提过自己以前在这片物业做过短期工程协助，还问过你通常几点下班。那些话当时都很普通。<br><br>今晚没有贵重物品丢失。被动过的却是拖鞋、窗帘、牙刷、手巾、充电线这些日常东西。<br><br>你不知道这一切究竟从什么时候开始，也没有证据替他解释原因。你只把能确认的事实留给警方。<br><br>第二天，在物业和警方陪同下，你搬离705，换了号码，也申请了调岗。<br><br>两周后，新办公室前台收到一个没有寄件人的纸箱。<br><br>里面是一双和705玄关同款、同尺码的新拖鞋。<br><br>左右并排摆得整整齐齐。');
+    setHTML(body,'你和陈阿姨先下了楼，把今晚拍下的照片、聊天记录和时间记录一起交给警方。你没有再回705收拾。<br><br>等候时，你重新翻了一遍另外几条细节：21:36的小票、搬家照里徐洲钥匙圈上的绿色硬塑料标签、704门框的新划痕、卫生间陌生的薄荷味、夹道里的旧充电线，以及那张只写着“705”和几个夜间时段的便签。<br><br>三个月前，徐洲把这套房源发给你，也来帮过你搬家。旧聊天里，他提过自己以前在这片物业做过短期工程协助，还问过你通常几点下班。那些话当时都很普通。<br><br>今晚没有贵重物品丢失。被动过的却是拖鞋、窗帘、牙刷、手巾、充电线这些日常东西。<br><br>你不知道这一切究竟从什么时候开始，也没有证据替他解释原因。你只把能确认的事实留给警方。<br><br>第二天，在物业和警方陪同下，你搬离705，换了号码，也申请了调岗。<br><br>两周后，新办公室前台收到一个没有寄件人的纸箱。<br><br>里面是一双和705玄关同款、同尺码的新拖鞋。<br><br>左右并排摆得整整齐齐。');
   }
 }
 function polishPaywall(){
@@ -446,6 +466,7 @@ function polishModal(){
   if(title==='时间线 · 第一步'||title==='时间线 · 第二步')polishTimeline(root,title);
   if(title==='房东周先生 · 电话')polishContact(root);
   if(title==='手机')polishPhone(root);
+  if(title==='搜索聊天记录')polishChatSearch(root);
   if(title==='徐洲 · 三个月前')polishOldChat(root);
   if(title==='随手记下的事')polishNotes(root);
   if(title==='703 · 陈阿姨')polishNeighbor(root);
@@ -461,13 +482,13 @@ function polishModal(){
 
 function polishEvent(){
   const layer=$('#eventLayer');if(!layer)return;const el=layer.querySelector('.event-text');if(!el)return;const t=el.textContent||'';
-  if(t.includes('房东的回答排除了最简单的解释'))setHTML(el,'23:08。通话结束。<br>周先生说自己今天没有进入705，备用钥匙仍在他手里；704白天有人施工。');
+  if(t.includes('房东的回答排除了最简单的解释'))setHTML(el,'23:08。通话结束。<br>周先生说自己今天没有进入705，备用钥匙仍在他手里；704目前空置等整改，今天施工只在公共区域。');
   else if(t.includes('三处细节都可以单独解释'))setText(el,'22:57。你想起早上出门前，手机里留过一张随手拍的照片。');
   else if(t.includes('你需要停止继续翻东西'))setText(el,'23:20。手机屏幕亮了一下。公司门禁、打车和门锁记录还留在“记录”里。');
   else if(t.includes('三处信息开始互相咬合'))setText(el,'23:37。你把刚才在七楼记下的几条内容重新翻了一遍。');
   else if(t.includes('夹层里第一次出现了一个具体名字'))setText(el,'23:47。揉皱的收件纸上写着：徐洲。');
   else if(t.includes('21:36，一张来自你家里的小票已经存在')){const where=(state().scene||$('#game')?.dataset.scene||'entry')==='entry'?'':'<br><br>屋里某处传来一声很轻的金属碰响。';setHTML(el,'21:36，那张便利店小票已经打印。<br>22:18，你才刷卡离开公司。<br><br>这张小票后来出现在705的垃圾袋里。'+where)}
-  else if(t.includes('这条路线至少在结构上成立'))setHTML(el,'23:42。陈阿姨把703的门开着，人在走廊。<br>你没有把705的门关上，只回卧室检查柜体外侧。');
+  else if(t.includes('这条路线至少在结构上成立'))setHTML(el,'23:42。陈阿姨把703的门开着，站在走廊。<br>你让她在705门外等着，自己只进卧室检查柜体这一侧；入户门没有反锁。');
   else if(t.includes('纸上出现了“徐洲”'))setHTML(el,'23:47。<br>废纸的收件人栏写着：徐洲。');
   else if(t.includes('坐在沙发上其实看不见卧室门口'))layer.innerHTML='';
 }
@@ -493,8 +514,9 @@ function wrapMemoryFlow(){
 }
 function wrapXuHistory(){
   const read=window.__readXuHistory;if(typeof read==='function'&&!read.__logicWrapped){
-    const wrapped=function(){if(!xuHistoryUnlocked()){showToast('当前没有明确的搜索关键词。');return}return read()};wrapped.__logicWrapped=true;window.__readXuHistory=wrapped;
+    const wrapped=function(){if(!xuHistoryUnlocked()){const mc=$('#modalContent');if(mc){mc.innerHTML=chatSearchHTML();const modal=$('#modal');modal?.classList.remove('hidden');polishModal()}return}return read()};wrapped.__logicWrapped=true;wrapped.__logicOriginal=read;window.__readXuHistory=wrapped;
   }
+  window.__logicSearchChat=function(){const input=$('#logicChatSearchInput');const q=(input?.value||'').trim().replace(/\s+/g,'');if(!q){showToast('输入一个姓名或关键词。');return}if(q.includes('徐洲')||q.toLowerCase()==='xu'){const fn=window.__readXuHistory?.__logicOriginal;if(typeof fn==='function')return fn();}showToast('没有找到匹配的旧聊天。')};
 }
 function wrapNeighborFlow(){
   const ask=window.__neighborAsk,finish=window.__finishNeighbor;
