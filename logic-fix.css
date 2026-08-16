@@ -1,9 +1,10 @@
-/* 2026-08 logic/narrative refinement: keep guidance available without repeating it on every frame. */
+/* 2026-08 logic/narrative refinement + visual consistency pass */
 .scene-caption > span{display:none!important}
-@media(min-width:761px){.scene-caption > p{display:none}.scene-caption{padding:18px;background:linear-gradient(0deg,#030507a8,#03050700)}}
+@media(min-width:761px){.scene-caption > p{display:none}.scene-caption{padding:18px;background:linear-gradient(0deg,#03050778,#03050700)}}
 .logic-unverified-route{color:#73797a!important;letter-spacing:.02em}
 .logic-locked-evidence{opacity:.42!important;cursor:not-allowed!important}
 .logic-source-note{font-size:11px!important;color:#8e9495!important;line-height:1.7!important}
+.logic-map-current{border-color:#8e826d!important;box-shadow:inset 0 0 0 1px #8e826d33;color:#e7dfd1!important}
 
 /* Safe-area and low-height landscape hardening. */
 .topbar{padding-left:max(18px,env(safe-area-inset-left));padding-right:max(18px,env(safe-area-inset-right))}
@@ -25,38 +26,75 @@
   .quick-nav button{padding:6px 9px}
   .event-text{top:3%;right:2%;width:min(360px,60%);padding:9px 11px;font-size:11px;line-height:1.6}
   .modal-card{max-height:94vh}
+  .live-map-card{min-height:170px!important}
 }
 
-/* 2026-08-16 interaction stability: no white scrollbar strip, no horizontal modal spill. */
+/* Interaction stability: no white scrollbar strip, no horizontal modal spill. */
 html,body,#app{overflow:hidden!important}
 .modal{overflow:hidden;color-scheme:dark}
-.modal-card{
-  overflow-y:auto!important;
-  overflow-x:hidden!important;
-  overscroll-behavior:contain;
-  scrollbar-gutter:stable;
-  scrollbar-width:thin;
-  scrollbar-color:#596164 #090d11;
-}
-.modal-card::-webkit-scrollbar{width:10px;height:10px}
-.modal-card::-webkit-scrollbar-track{background:#090d11}
-.modal-card::-webkit-scrollbar-thumb{background:#596164;border:2px solid #090d11;border-radius:10px}
-.modal-card::-webkit-scrollbar-corner{background:#090d11}
+.modal-card{overflow-y:auto!important;overflow-x:hidden!important;overscroll-behavior:contain;scrollbar-gutter:stable;scrollbar-width:thin;scrollbar-color:#596164 #090d11}
+.modal-card::-webkit-scrollbar{width:10px;height:10px}.modal-card::-webkit-scrollbar-track{background:#090d11}.modal-card::-webkit-scrollbar-thumb{background:#596164;border:2px solid #090d11;border-radius:10px}.modal-card::-webkit-scrollbar-corner{background:#090d11}
 #modalContent{min-width:0;max-width:100%;overflow:visible}
-.modal-card.logic-memory-card{contain:layout paint;}
-.modal-card.logic-memory-card .compare-layout,
-.modal-card.logic-memory-card .choice-grid{contain:layout;}
-.modal-card.logic-memory-card .choice-grid button{min-height:58px}
-.modal-card.logic-memory-card .compare-shot img{background:#080c0f}
-@media(min-width:761px){
-  .modal-card.logic-memory-card.wide{width:min(980px,calc(100vw - 44px));}
-}
-@media(max-width:760px){
-  .modal-card{width:100%;max-height:calc(100dvh - max(16px,env(safe-area-inset-top)) - max(16px,env(safe-area-inset-bottom)));}
-  .modal-card.logic-memory-card{contain:none}
-  .modal-card.logic-memory-card .choice-grid button{min-height:52px}
-}
+.modal-card.logic-memory-card{contain:layout paint}.modal-card.logic-memory-card .compare-layout,.modal-card.logic-memory-card .choice-grid{contain:layout}.modal-card.logic-memory-card .choice-grid button{min-height:58px}.modal-card.logic-memory-card .compare-shot img{background:#080c0f}
+@media(min-width:761px){.modal-card.logic-memory-card.wide{width:min(980px,calc(100vw - 44px))}}
+@media(max-width:760px){.modal-card{width:100%;max-height:calc(100dvh - max(16px,env(safe-area-inset-top)) - max(16px,env(safe-area-inset-bottom)))}.modal-card.logic-memory-card{contain:none}.modal-card.logic-memory-card .choice-grid button{min-height:52px}}
+.logic-history-locked{display:none!important}.logic-phone-context{font-size:11px!important;color:#777f81!important;margin:12px 0 0!important}
 
-/* Early-game phone should establish Xu Zhou as an ordinary colleague, not hand out the later relationship clue. */
-.logic-history-locked{display:none!important}
-.logic-phone-context{font-size:11px!important;color:#777f81!important;margin:12px 0 0!important}
+/* Visual direction: less generic dark-dashboard styling, more ordinary-apartment field-notes feel. */
+html,body{font-family:"PingFang SC","Microsoft YaHei","Noto Sans CJK SC",system-ui,sans-serif;background:#07090a!important}
+.title-card h1,.ending-title{font-family:"Noto Serif SC","Songti SC","SimSun",serif}
+.title-card{background:transparent!important;backdrop-filter:none!important;box-shadow:none!important;border-left:2px solid #91846d!important;padding-left:30px!important}
+.title-shade{background:linear-gradient(90deg,#050708f7 0%,#06090bd8 42%,#06090b73 76%,#06090b2f 100%),linear-gradient(0deg,#030405c4,#0000 60%)!important}
+.topbar{background:#090c0e!important;border-bottom-color:#252a2c!important}
+.top-actions{gap:0!important}
+.top-actions button{background:transparent!important;border:0!important;border-left:1px solid #262b2d!important;border-radius:0!important;color:#aaaead!important;padding:8px 12px!important}
+.top-actions button:hover{background:#ffffff05!important;color:#e5e1d9!important}
+#supportAuthorBtn{color:#c0ad8d!important}
+.play-area{background:#080a0b!important;gap:10px!important}
+.scene-frame{background:#0b0d0e!important;border-color:#2b2f30!important;box-shadow:0 14px 42px #0008!important}
+.scene-frame img{filter:saturate(.84) contrast(1.015) brightness(.98)!important}
+.game[data-scene="entry"] .scene-frame img{filter:saturate(.88) contrast(1.01) brightness(.99)!important}
+.game[data-scene="living"] .scene-frame img{filter:saturate(.84) contrast(1.015) brightness(.985)!important}
+.game[data-scene="bedroom"] .scene-frame img{filter:saturate(.82) contrast(1.02) brightness(.985)!important}
+.game[data-scene="bathroom"] .scene-frame img{filter:saturate(.80) contrast(1.015) brightness(.99)!important}
+.game[data-scene="hallway"] .scene-frame img{filter:saturate(.76) contrast(1.03) brightness(.94)!important}
+.scene-tint{background:linear-gradient(180deg,#02030405 0%,#02030412 58%,#0203043d 100%)!important;mix-blend-mode:normal!important}
+.film-grain{opacity:.055!important;mix-blend-mode:soft-light!important}
+.event-text{background:#0b0e10f2!important;border-color:#34393b!important;border-left:2px solid #8c806c!important;box-shadow:0 12px 34px #0009!important}
+
+.desktop-sidebar{gap:0!important;border-left:1px solid #24292b;padding-left:10px;min-height:0}
+.sidebar-card{min-height:auto!important;background:#0a0d0f!important;border:0!important;border-top:1px solid #2a2f31!important;border-left:0!important;padding:14px 13px!important;box-shadow:none!important;overflow:visible!important}
+.sidebar-card::after{display:none!important}
+.sidebar-card:first-child{border-top:0!important}
+.sidebar-card .label{color:#777e80!important;letter-spacing:.13em!important}
+.sidebar-card p{color:#d6d3cc!important}
+.progress-track{background:#1c2224!important}.progress-track i{background:#8f826d!important}
+.quick-nav{background:#080a0b!important;border-top:1px solid #171b1c;padding-top:7px!important}
+.quick-nav button{background:transparent!important;border-color:#262b2c!important;color:#919797!important}
+.quick-nav button.current{background:#111517!important;border-color:#716856!important;color:#dfd9ce!important}
+.modal-card{background:#0b0f11!important;border-color:#303638!important;box-shadow:0 20px 70px #000c!important}
+.choice-grid button,.modal-action,.evidence-btn,.tab-btn,.gap-item,.person-card{background:#0f1416!important;border-color:#303638!important;border-radius:0!important}
+.choice-grid button:hover,.modal-action:hover,.evidence-btn:hover,.tab-btn:hover,.gap-item:hover,.person-card:hover{background:#151a1c!important}
+.clue,.phone-screen,.compare-shot,.floor-plan{background:#0d1113!important}
+.message{border-radius:2px!important}.message.them{background:#1b2123!important}.message.me{background:#3b4540!important}
+
+/* Always-visible 2D location map in the previously empty lower-right sidebar area. */
+.live-map-card{margin-top:auto!important;padding-top:13px!important;padding-bottom:12px!important;min-height:205px!important;border-top:1px solid #34393a!important;background:#090c0e!important}
+.live-map-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:10px}
+.live-map-head #liveMapStatus{font-size:10px;color:#bbb5aa;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:112px}
+.mini-plan{position:relative;display:grid;grid-template-columns:.9fr 1.18fr;grid-template-rows:58px 46px;gap:3px;padding:5px;border:1px solid #34393b;background:#070a0b}
+.mini-room{position:relative;display:flex;align-items:center;justify-content:center;border:1px solid #252a2c;background:#0d1113;color:#6f7677;font-size:9px;letter-spacing:.02em;transition:border-color .2s ease,color .2s ease,background .2s ease}
+.mini-bedroom{grid-column:1;grid-row:1}.mini-living{grid-column:2;grid-row:1}.mini-bathroom{grid-column:1;grid-row:2}.mini-entry{grid-column:2;grid-row:2}
+.mini-room.current,.mini-hall.current{border-color:#9a8b72!important;color:#ded5c6!important;background:#171713!important}
+.mini-room.current::after,.mini-hall.current::after{content:"";position:absolute;width:7px;height:7px;border-radius:50%;background:#cbb893;box-shadow:0 0 0 3px #cbb89320}
+.mini-room.current::after{right:7px;top:7px}.mini-hall.current::after{right:9px;top:50%;transform:translateY(-50%)}
+.mini-hall{position:relative;margin-top:5px;height:27px;border:1px dashed #2a3031;display:flex;align-items:center;justify-content:center;color:#646b6c;font-size:9px;background:#080b0c}
+.live-map-card.hall-known .mini-hall{border-style:solid;color:#858b8b}
+.mini-map-note{display:block!important;margin-top:8px!important;color:#6f7677!important;font-size:9px!important;line-height:1.45!important;min-height:26px}
+
+@media(max-width:1000px) and (min-width:761px){
+  .desktop-sidebar{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:1px!important;padding-left:0;border-left:0}
+  .live-map-card{grid-column:1/-1;margin-top:0!important;min-height:160px!important}
+  .mini-plan{grid-template-rows:42px 36px}.mini-hall{height:24px}
+}
+@media(max-width:760px){.desktop-sidebar{display:none!important}.title-card{background:#070b0fc2!important;padding-left:24px!important;border-left:1px solid #91846d!important}}

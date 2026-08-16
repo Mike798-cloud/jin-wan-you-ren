@@ -5,19 +5,38 @@ const SAVE_KEY='tonight_someone_was_here_v2';
 const OLD_SAVE_KEY='tonight_someone_was_here_v1';
 const META_KEY='tonight_someone_was_here_meta';
 const $=s=>document.querySelector(s);
+const $$=s=>[...document.querySelectorAll(s)];
+const VALID_SCENES=['entry','living','bedroom','bathroom','hallway'];
+const SCENE_LABELS={entry:'玄关 / 厨房',living:'客厅',bedroom:'卧室',bathroom:'卫生间',hallway:'七楼走廊'};
 
 function readJSON(key,fallback={}){
   try{return JSON.parse(localStorage.getItem(key)||'null')||fallback}catch(e){return fallback}
 }
-function state(){return readJSON(SAVE_KEY,{flags:{},clues:[],optional:[]})}
+function state(){return readJSON(SAVE_KEY,{flags:{},clues:[],optional:[],visited:[]})}
 function meta(){return readJSON(META_KEY,{endingsSeen:[],completed:false})}
 function hasSave(){return !!localStorage.getItem(SAVE_KEY)||!!localStorage.getItem(OLD_SAVE_KEY)}
+function hasActiveSave(){const s=state();return hasSave()&&!s.ending&&Number(s.stage)<11}
 function showToast(text){
   const el=$('#toast');if(!el)return;
   el.textContent=text;el.classList.remove('hidden');
   clearTimeout(showToast.t);showToast.t=setTimeout(()=>el.classList.add('hidden'),2100);
 }
 function byText(root,selector,needle){return [...root.querySelectorAll(selector)].find(el=>(el.textContent||'').includes(needle))}
+
+function repairStoredState(){
+  let s;try{s=JSON.parse(localStorage.getItem(SAVE_KEY)||'null')}catch(e){return}
+  if(!s||typeof s!=='object'||Array.isArray(s))return;
+  let changed=false;
+  const ensureArray=(obj,key)=>{if(!Array.isArray(obj[key])){obj[key]=[];changed=true}};
+  ['clues','optional','visited'].forEach(k=>ensureArray(s,k));
+  if(!s.flags||typeof s.flags!=='object'||Array.isArray(s.flags)){s.flags={};changed=true}
+  ['memorySelected','landlordQuestions','timelineSeq','neighborTopics','routeFacts','gapInspected','identityFacts'].forEach(k=>ensureArray(s.flags,k));
+  if(!s.hints||typeof s.hints!=='object'||Array.isArray(s.hints)){s.hints={};changed=true}
+  if(!VALID_SCENES.includes(s.scene)){s.scene='entry';changed=true}
+  const st=Number(s.stage);if(!Number.isFinite(st)||st<0||st>11){s.stage=0;changed=true}
+  if(!Array.isArray(s.visited)||!s.visited.includes(s.scene)){if(!Array.isArray(s.visited))s.visited=[];s.visited.push(s.scene);changed=true}
+  if(changed){try{localStorage.setItem(SAVE_KEY,JSON.stringify(s))}catch(e){}}
+}
 
 function polishIntro(root){
   const ps=[...root.querySelectorAll(':scope > p')];
@@ -34,20 +53,20 @@ function polishChain(root){
   if(p.innerHTML!==html)p.innerHTML=html;
 }
 function polishMap(root){
-  const arrow=root.querySelector('.route-arrow');if(!arrow)return;
+  const arrow=root.querySelector('.route-arrow');
   const s=state(),known=(s.clues||[]).includes('shaftNotice');
-  if(known){
-    arrow.textContent='704旧检修竖井 ⇄ 705柜体后方';
-    arrow.classList.remove('logic-unverified-route');
-  }else{
-    arrow.textContent='704 与 705 相邻 · 建筑内部结构尚未核实';
-    arrow.classList.add('logic-unverified-route');
+  if(arrow){
+    if(known){arrow.textContent='704旧检修竖井 ⇄ 705柜体后方';arrow.classList.remove('logic-unverified-route')}
+    else{arrow.textContent='704 与 705 相邻 · 建筑内部结构尚未核实';arrow.classList.add('logic-unverified-route')}
   }
+  const you=root.querySelector('.floor-line .you');
+  if(you)you.innerHTML='705<br><span class="muted">你的住处</span>';
+  const current=SCENE_LABELS[s.scene]||'';
+  [...root.querySelectorAll('.map-room')].forEach(room=>room.classList.toggle('logic-map-current',(room.textContent||'').trim().startsWith(current)));
 }
 function polishMemory(root){
   const p=[...root.querySelectorAll('p.muted')].find(x=>x.textContent.includes('照片没有拍到'));
   if(p)p.remove();
-  const card=root.closest('.modal-card');if(card)card.classList.add('logic-memory-card');
 }
 function polishTimeline(root){
   const p=root.querySelector(':scope > p');
@@ -59,29 +78,6 @@ function polishContact(root){
   const msg=byText(root,'.message.them','共用检修井');
   if(msg)msg.textContent='周先生：704一直空着。物业这阵子在改旧管线，七楼旧房型以前也有封板松动的问题；具体结构你得看现场的维修通知。';
 }
-function xuHistoryUnlocked(){
-  const s=state(),clues=s.clues||[];
-  return clues.includes('delivery')||Number(s.stage)>=9;
-}
-function polishPhone(root){
-  const recent=byText(root,'.message.them.old','徐洲 · 上周四');
-  if(recent){
-    const neutral='徐洲 · 上周四\n周五那版表我替你收尾。附件我放群里了，明早再看。';
-    if(recent.textContent!==neutral)recent.textContent=neutral;
-  }
-  const historyBtn=byText(root,'.evidence-btn','徐洲 · 三个月前');
-  if(historyBtn&&!xuHistoryUnlocked()){
-    historyBtn.classList.add('logic-history-locked');
-    const h=historyBtn.previousElementSibling;
-    if(h&&h.tagName==='H3'&&h.textContent.trim()==='旧聊天')h.classList.add('logic-history-locked');
-    const d=h&&h.previousElementSibling;
-    if(d&&d.classList.contains('divider'))d.classList.add('logic-history-locked');
-    if(!root.querySelector('.logic-phone-context')){
-      const screen=root.querySelector('.phone-screen');
-      if(screen){const note=document.createElement('p');note.className='logic-phone-context';note.textContent='这里只保留近期消息。更早的聊天记录很多，暂时没有理由逐条翻。';screen.insertAdjacentElement('afterend',note);}
-    }
-  }
-}
 function polishNotes(root){
   [...root.querySelectorAll('.optional-group .clue small')].forEach(x=>x.remove());
   const t=root.querySelector('.optional-group .clue-group-title');
@@ -92,9 +88,7 @@ function polishNotes(root){
 function polishNeighbor(root){
   const s=state(),q=(s.flags&&s.flags.neighborTopics)||[];
   const timeBtn=[...root.querySelectorAll('button')].find(b=>(b.getAttribute('onclick')||'').includes("__neighborAsk('time')"));
-  if(timeBtn&&!q.includes('people')){
-    timeBtn.disabled=true;timeBtn.title='先问清她看到的是谁';
-  }
+  if(timeBtn&&!q.includes('people')){timeBtn.disabled=true;timeBtn.title='先问清她看到的是谁'}
   const intro=root.querySelector(':scope > p');
   const introText='陈阿姨没有主动下结论。你需要把“看见谁、听见什么、什么时候见过”分开问。';if(intro&&intro.textContent!==introText)intro.textContent=introText;
 }
@@ -107,9 +101,7 @@ function polishIdentity(root){
     if(name==='物业旧工程员'&&desc.textContent!=='可能熟悉旧楼结构 · 身份未明')desc.textContent='可能熟悉旧楼结构 · 身份未明';
   });
   const old=byText(root,'.evidence-btn','旧聊天：');
-  if(old&&!clues.includes('oldChat')){
-    old.textContent='旧聊天：尚未核对';old.disabled=true;old.classList.add('logic-locked-evidence');
-  }
+  if(old&&!clues.includes('oldChat')){old.textContent='旧聊天：尚未核对';old.disabled=true;old.classList.add('logic-locked-evidence')}
   const warn=root.querySelector('.result-warn');
   const warnHtml='<p>还缺一条能确认“帮你搬家的人是谁”的关系信息。先回到你已经拥有的记录里找来源。</p>';if(warn&&!clues.includes('oldChat')&&warn.innerHTML!==warnHtml)warn.innerHTML=warnHtml;
 }
@@ -133,9 +125,61 @@ function polishPaywall(){
   const last=overlay.querySelector('.paywall-msg-warm2');
   const lastText='不支持也完全没关系。所有剧情、三级提示、结局和二周目内容都不会因此受影响。';if(last&&last.textContent!==lastText)last.textContent=lastText;
 }
+
+function setFirstParagraph(root,html){const p=root.querySelector(':scope > p');if(p&&p.innerHTML!==html)p.innerHTML=html}
+function polishSceneConsistency(root,title){
+  const s=state();
+  if(title==='窗帘')setFirstParagraph(root,'两侧帘布都收在窗边，整扇窗露着。你只是停下来多看了一眼；在没有早晨参照前，这本身还不能算异常。');
+  if(title==='卧室窗帘')setFirstParagraph(root,'两侧帘布今晚都被收到窗边，右侧已经推到轨道尽头。你记得早上为了让植物晒太阳，只留了大约半扇窗宽的空隙。<br><br>现在开的幅度明显更大。');
+  if(title==='窗边')setFirstParagraph(root,'窗帘收在两侧，窗户锁着。城市灯光直接落进客厅。');
+  if(title==='客厅窗边')setFirstParagraph(root,'你走到窗边重新检查。窗帘收在两侧，窗锁没有被动过；外墙下方也没有能让人落脚的平台。<br><br>这条路线可以先排除。');
+  if(title==='地垫')setFirstParagraph(root,'地垫中央有一块颜色比边缘更深。你蹲下用指背碰了碰：那一块还带着潮气，像是不久前有人踩着湿脚停过。<br><br>你早上七点洗的澡，不该到接近十一点还留下这么集中的湿痕。');
+  if(title==='手巾')setFirstParagraph(root,'远看它只是挂在架上。你拿起来才发现两道很整齐的折痕——你习惯对折，它却像被三折后重新挂回去。<br><br>这个细节在房间远景里不明显，拿在手里却很清楚。');
+  if(title==='床头插座')setFirstParagraph(root,'你弯下腰看床头柜后方，才发现充电线插在右侧墙插。你从来不用这个口，因为床头柜会压住插头。<br><br>线没有坏，只是位置不对。');
+  if(title==='沙发')setFirstParagraph(root,'你把靠垫拿起来翻过一面，拉链正朝外。你每次坐下都会把拉链面压到里侧。<br><br>这是弱异常，只值得记下，不值得单独下结论。');
+  if(title==='茶几和沙发')setFirstParagraph(root,'遥控器、纸巾和杯垫都在。你顺手把旁边的靠垫拿起来，才看到它被翻到了平时不用的那一面。<br><br>它本身不能证明什么，只作为额外细节记下。');
+  if(title==='玄关的拖鞋')setFirstParagraph(root,'你蹲下来才看清：一只拖鞋斜着朝里，另一只抵在鞋柜边。你记得早上扫地时把两只并排推到了柜子下面。<br><br>先把差异记下来，不急着相信记忆。');
+  if(title==='冰箱')setFirstParagraph(root,'你拉开冰箱门。最上层多了一瓶你从不买的常温矿泉水，瓶盖已经拧开过。<br><br>你平时只买苏打水。');
+  if(title==='垃圾桶')setFirstParagraph(root,'你拨开上面的纸巾和快递袋，下面压着两个同款一次性咖啡杯。你今天没有买咖啡回家。<br><br>再往下是一张揉皱的便利店小票：<b>21:36</b>。而你22点以后还在公司。');
+  if(title==='镜子'&&Number(s.stage)>=3)setFirstParagraph(root,'镜面边缘留着一圈已经快散掉的水汽痕。你凑近查看时，还闻到很淡的薄荷漱口水味。<br><br>你不用漱口水。');
+  if(title==='704房门')setFirstParagraph(root,'走近以后你才看清：门边“空置维修，请勿进入”的封条右下角被揭开过，又重新压了回去。<br><br>门框内侧还有几道新划痕，像有人反复用硬物顶过锁舌。');
+  if(title==='维修通知')setFirstParagraph(root,'电表旁压着一张卷边的七楼管线改造通知。上面写着：<b>704 与 705 共用一条旧检修竖井</b>。<br><br>竖井在两户卧室柜体后方封板处各有一个检修口。');
+}
+
+function miniMapMarkup(){
+  return `<div class="live-map-head"><span class="label">705 · 房间示意</span><span id="liveMapStatus">玄关 / 厨房</span></div>
+  <div class="mini-plan" role="img" aria-label="705房间位置示意图，圆点表示当前位置">
+    <div class="mini-room mini-bedroom" data-map-room="bedroom"><span>卧室</span></div>
+    <div class="mini-room mini-living" data-map-room="living"><span>客厅</span></div>
+    <div class="mini-room mini-bathroom" data-map-room="bathroom"><span>卫生间</span></div>
+    <div class="mini-room mini-entry" data-map-room="entry"><span>玄关 / 厨房</span></div>
+  </div>
+  <div class="mini-hall" data-map-room="hallway"><span id="liveMapHallLabel">门外走廊</span></div>
+  <small id="liveMapNote" class="mini-map-note">圆点表示你现在的位置</small>`;
+}
+function installMiniMap(){
+  const sidebar=$('#desktopSidebar');if(!sidebar||$('#liveMapCard'))return;
+  const card=document.createElement('div');card.id='liveMapCard';card.className='sidebar-card live-map-card';card.innerHTML=miniMapMarkup();sidebar.appendChild(card);updateMiniMap();
+}
+function updateMiniMap(){
+  const card=$('#liveMapCard');if(!card)return;
+  const s=state(),scene=VALID_SCENES.includes(s.scene)?s.scene:($('#game')?.dataset.scene||'entry');
+  card.dataset.current=scene;card.dataset.stage=String(Number(s.stage)||0);
+  card.querySelectorAll('[data-map-room]').forEach(el=>el.classList.toggle('current',el.dataset.mapRoom===scene));
+  const status=$('#liveMapStatus');if(status)status.textContent=SCENE_LABELS[scene]||'705';
+  const knownHall=Number(s.stage)>=6||(s.visited||[]).includes('hallway');
+  card.classList.toggle('hall-known',knownHall);
+  const hall=$('#liveMapHallLabel');if(hall)hall.textContent=knownHall?'703 · 704 · 705':'门外走廊';
+  const note=$('#liveMapNote'),clues=s.clues||[];
+  if(note){
+    if(clues.includes('shaftNotice'))note.textContent='已确认：704 与 705 共用旧检修竖井';
+    else if(scene==='hallway')note.textContent='你现在在七楼公共走廊';
+    else note.textContent='圆点表示你现在的位置 · 平面仅作方向示意';
+  }
+}
+
 function polishModal(){
   const root=$('#modalContent');if(!root||!root.children.length)return;
-  const card=root.closest('.modal-card');if(card)card.classList.remove('logic-memory-card');
   const title=root.querySelector('h2')?.textContent.trim()||'';
   if(title==='22:48')polishIntro(root);
   if(title==='防盗链')polishChain(root);
@@ -143,91 +187,53 @@ function polishModal(){
   if(title==='07:12 · 记忆核对')polishMemory(root);
   if(title==='时间线 · 第一步')polishTimeline(root);
   if(title==='房东周先生 · 电话')polishContact(root);
-  if(title==='手机')polishPhone(root);
   if(title==='随手记下的事')polishNotes(root);
   if(title==='703 · 陈阿姨')polishNeighbor(root);
   if(title==='身份交叉')polishIdentity(root);
   if(title.startsWith('结局档案'))polishArchive(root);
   if(root.querySelector('.ending'))polishEnding(root);
-}
-
-function afterPaint(fn){
-  if(typeof requestAnimationFrame==='function')requestAnimationFrame(()=>requestAnimationFrame(fn));
-  else setTimeout(fn,0);
-}
-function wrapMemoryFlow(){
-  const toggle=window.__memoryToggle;
-  if(typeof toggle==='function'&&!toggle.__logicWrapped){
-    const wrapped=function(id){
-      const card=document.querySelector('.modal-card');
-      const y=card?card.scrollTop:0;
-      const result=toggle(id);
-      const immediate=document.querySelector('.modal-card');if(immediate)immediate.scrollTop=y;
-      afterPaint(()=>{
-        const next=document.querySelector('.modal-card');if(next)next.scrollTop=y;
-        const root=$('#modalContent');
-        if(root){const btn=[...root.querySelectorAll('button')].find(b=>(b.getAttribute('onclick')||'').includes(`__memoryToggle('${id}')`));if(btn&&typeof btn.focus==='function'){try{btn.focus({preventScroll:true})}catch(e){}}}
-      });
-      return result;
-    };wrapped.__logicWrapped=true;window.__memoryToggle=wrapped;
-  }
-}
-function wrapXuHistory(){
-  const read=window.__readXuHistory;
-  if(typeof read==='function'&&!read.__logicWrapped){
-    const wrapped=function(){
-      if(!xuHistoryUnlocked()){showToast('现在还没有理由翻到三个月前。先继续确认今晚留下的痕迹。');return;}
-      return read();
-    };wrapped.__logicWrapped=true;window.__readXuHistory=wrapped;
-  }
+  polishSceneConsistency(root,title);
 }
 function wrapNeighborFlow(){
   const ask=window.__neighborAsk,finish=window.__finishNeighbor;
   if(typeof ask==='function'&&!ask.__logicWrapped){
-    const wrapped=function(id){
-      const q=((state().flags||{}).neighborTopics)||[];
-      if(id==='time'&&!q.includes('people')){showToast('先问清她看到的是谁，再追问出现时间');return;}
-      return ask(id);
-    };wrapped.__logicWrapped=true;window.__neighborAsk=wrapped;
+    const wrapped=function(id){const q=((state().flags||{}).neighborTopics)||[];if(id==='time'&&!q.includes('people')){showToast('先问清她看到的是谁，再追问出现时间');return}return ask(id)};wrapped.__logicWrapped=true;window.__neighborAsk=wrapped;
   }
   if(typeof finish==='function'&&!finish.__logicWrapped){
-    const wrapped=function(){
-      const q=((state().flags||{}).neighborTopics)||[];
-      if(!q.includes('people')||!(q.includes('noise')||q.includes('time'))){showToast('先确认她见到的是谁，再补问一条细节');return;}
-      return finish();
-    };wrapped.__logicWrapped=true;window.__finishNeighbor=wrapped;
+    const wrapped=function(){const q=((state().flags||{}).neighborTopics)||[];if(!q.includes('people')||!(q.includes('noise')||q.includes('time'))){showToast('先确认她见到的是谁，再补问一条细节');return}return finish()};wrapped.__logicWrapped=true;window.__finishNeighbor=wrapped;
   }
 }
 function wrapSaveActions(){
   const start=$('#startBtn');
-  if(start&&typeof start.onclick==='function'&&!start.dataset.logicWrapped){
-    const orig=start.onclick;start.dataset.logicWrapped='1';start.onclick=function(e){if(hasSave()&&!confirm('已有未结束的调查存档。确定从22:48重新开始并覆盖它吗？'))return;return orig.call(this,e)};
-  }
+  if(start&&typeof start.onclick==='function'&&!start.dataset.logicWrapped){const orig=start.onclick;start.dataset.logicWrapped='1';start.onclick=function(e){if(hasActiveSave()&&!confirm('已有未结束的调查存档。确定从22:48重新开始并覆盖它吗？'))return;return orig.call(this,e)}}
   const review=$('#reviewBtn');
-  if(review&&typeof review.onclick==='function'&&!review.dataset.logicWrapped){
-    const orig=review.onclick;review.dataset.logicWrapped='1';review.onclick=function(e){if(hasSave()&&!confirm('快速复盘会覆盖当前调查存档。确定继续吗？'))return;return orig.call(this,e)};
-  }
+  if(review&&typeof review.onclick==='function'&&!review.dataset.logicWrapped){const orig=review.onclick;review.dataset.logicWrapped='1';review.onclick=function(e){if(hasActiveSave()&&!confirm('快速复盘会覆盖当前调查存档。确定继续吗？'))return;return orig.call(this,e)}}
+  const cont=$('#continueBtn');
+  if(cont&&typeof cont.onclick==='function'&&!cont.dataset.logicWrapped){const orig=cont.onclick;cont.dataset.logicWrapped='1';cont.onclick=function(e){const s=state();if(s.ending||Number(s.stage)>=11){if(typeof window.__showArchive==='function')window.__showArchive();else showToast('这份调查已经结束，请查看结局档案');return}return orig.call(this,e)}}
   const restart=window.__restart;
-  if(typeof restart==='function'&&!restart.__logicWrapped){
-    const wrapped=function(){const s=state();if(!s.ending&&hasSave()&&!confirm('确定清除当前调查进度并回到标题吗？'))return;return restart()};wrapped.__logicWrapped=true;window.__restart=wrapped;
-  }
+  if(typeof restart==='function'&&!restart.__logicWrapped){const wrapped=function(){const s=state();if(!s.ending&&hasSave()&&!confirm('确定清除当前调查进度并回到标题吗？'))return;return restart()};wrapped.__logicWrapped=true;window.__restart=wrapped}
+}
+function syncTitleButtons(){
+  const cont=$('#continueBtn'),archive=$('#endingArchiveBtn'),s=state();
+  if(cont&&(s.ending||Number(s.stage)>=11)){cont.classList.add('hidden');if(archive&&(meta().endingsSeen||[]).length)archive.classList.remove('hidden')}
 }
 function installObservers(){
   const root=$('#modalContent');
-  if(root){let queued=false;new MutationObserver(()=>{if(queued)return;queued=true;queueMicrotask(()=>{queued=false;polishModal()})}).observe(root,{childList:true,subtree:true,characterData:true});}
+  if(root){let queued=false;new MutationObserver(()=>{if(queued)return;queued=true;queueMicrotask(()=>{queued=false;polishModal()})}).observe(root,{childList:true,subtree:true,characterData:true})}
   new MutationObserver(()=>polishPaywall()).observe(document.body,{childList:true,subtree:true});
+  const game=$('#game');if(game)new MutationObserver(()=>updateMiniMap()).observe(game,{attributes:true,attributeFilter:['data-scene']});
+  ['#sceneName','#stageLabel','#clueCount','#progressText'].forEach(sel=>{const el=$(sel);if(el)new MutationObserver(()=>{updateMiniMap();syncTitleButtons()}).observe(el,{childList:true,subtree:true,characterData:true})});
 }
 function selfCheck(){
-  const checks={
-    saveKey:typeof SAVE_KEY==='string',neighborWrapped:!!window.__finishNeighbor?.__logicWrapped,
-    memoryWrapped:!!window.__memoryToggle?.__logicWrapped,xuHistoryWrapped:!!window.__readXuHistory?.__logicWrapped,
-    restartWrapped:!!window.__restart?.__logicWrapped,modalPresent:!!$('#modalContent'),
-    gameQaPresent:!!window.__GAME_QA__,paywallIndependent:typeof window.Paywall==='object'
+  const s=state(),checks={
+    saveKey:typeof SAVE_KEY==='string',neighborWrapped:!!window.__finishNeighbor?.__logicWrapped,restartWrapped:!!window.__restart?.__logicWrapped,
+    modalPresent:!!$('#modalContent'),gameQaPresent:!!window.__GAME_QA__,paywallIndependent:typeof window.Paywall==='object',
+    miniMapPresent:!!$('#liveMapCard'),validScene:VALID_SCENES.includes(s.scene||'entry'),visualConsistency:typeof polishSceneConsistency==='function'
   };
-  window.__LOGIC_FIX_QA__={checks,pass:Object.values(checks).every(Boolean),state:()=>state()};
+  window.__LOGIC_FIX_QA__={checks,pass:Object.values(checks).every(Boolean),state:()=>state(),refreshMap:updateMiniMap};
 }
 function init(){
-  wrapNeighborFlow();wrapMemoryFlow();wrapXuHistory();wrapSaveActions();installObservers();polishModal();polishPaywall();selfCheck();
+  repairStoredState();wrapNeighborFlow();wrapSaveActions();installMiniMap();installObservers();polishModal();polishPaywall();updateMiniMap();syncTitleButtons();selfCheck();
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
 })();
