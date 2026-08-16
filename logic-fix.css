@@ -26,3 +26,37 @@
   .event-text{top:3%;right:2%;width:min(360px,60%);padding:9px 11px;font-size:11px;line-height:1.6}
   .modal-card{max-height:94vh}
 }
+
+/* 2026-08-16 interaction stability: no white scrollbar strip, no horizontal modal spill. */
+html,body,#app{overflow:hidden!important}
+.modal{overflow:hidden;color-scheme:dark}
+.modal-card{
+  overflow-y:auto!important;
+  overflow-x:hidden!important;
+  overscroll-behavior:contain;
+  scrollbar-gutter:stable;
+  scrollbar-width:thin;
+  scrollbar-color:#596164 #090d11;
+}
+.modal-card::-webkit-scrollbar{width:10px;height:10px}
+.modal-card::-webkit-scrollbar-track{background:#090d11}
+.modal-card::-webkit-scrollbar-thumb{background:#596164;border:2px solid #090d11;border-radius:10px}
+.modal-card::-webkit-scrollbar-corner{background:#090d11}
+#modalContent{min-width:0;max-width:100%;overflow:visible}
+.modal-card.logic-memory-card{contain:layout paint;}
+.modal-card.logic-memory-card .compare-layout,
+.modal-card.logic-memory-card .choice-grid{contain:layout;}
+.modal-card.logic-memory-card .choice-grid button{min-height:58px}
+.modal-card.logic-memory-card .compare-shot img{background:#080c0f}
+@media(min-width:761px){
+  .modal-card.logic-memory-card.wide{width:min(980px,calc(100vw - 44px));}
+}
+@media(max-width:760px){
+  .modal-card{width:100%;max-height:calc(100dvh - max(16px,env(safe-area-inset-top)) - max(16px,env(safe-area-inset-bottom)));}
+  .modal-card.logic-memory-card{contain:none}
+  .modal-card.logic-memory-card .choice-grid button{min-height:52px}
+}
+
+/* Early-game phone should establish Xu Zhou as an ordinary colleague, not hand out the later relationship clue. */
+.logic-history-locked{display:none!important}
+.logic-phone-context{font-size:11px!important;color:#777f81!important;margin:12px 0 0!important}

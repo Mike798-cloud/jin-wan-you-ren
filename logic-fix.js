@@ -47,6 +47,7 @@ function polishMap(root){
 function polishMemory(root){
   const p=[...root.querySelectorAll('p.muted')].find(x=>x.textContent.includes('照片没有拍到'));
   if(p)p.remove();
+  const card=root.closest('.modal-card');if(card)card.classList.add('logic-memory-card');
 }
 function polishTimeline(root){
   const p=root.querySelector(':scope > p');
@@ -57,6 +58,29 @@ function polishContact(root){
   const introText='你把问题拆成三件能分别核实的事：今天有没有进过705、备用钥匙在哪里、704正在做什么维修。';if(intro&&intro.textContent!==introText)intro.textContent=introText;
   const msg=byText(root,'.message.them','共用检修井');
   if(msg)msg.textContent='周先生：704一直空着。物业这阵子在改旧管线，七楼旧房型以前也有封板松动的问题；具体结构你得看现场的维修通知。';
+}
+function xuHistoryUnlocked(){
+  const s=state(),clues=s.clues||[];
+  return clues.includes('delivery')||Number(s.stage)>=9;
+}
+function polishPhone(root){
+  const recent=byText(root,'.message.them.old','徐洲 · 上周四');
+  if(recent){
+    const neutral='徐洲 · 上周四\n周五那版表我替你收尾。附件我放群里了，明早再看。';
+    if(recent.textContent!==neutral)recent.textContent=neutral;
+  }
+  const historyBtn=byText(root,'.evidence-btn','徐洲 · 三个月前');
+  if(historyBtn&&!xuHistoryUnlocked()){
+    historyBtn.classList.add('logic-history-locked');
+    const h=historyBtn.previousElementSibling;
+    if(h&&h.tagName==='H3'&&h.textContent.trim()==='旧聊天')h.classList.add('logic-history-locked');
+    const d=h&&h.previousElementSibling;
+    if(d&&d.classList.contains('divider'))d.classList.add('logic-history-locked');
+    if(!root.querySelector('.logic-phone-context')){
+      const screen=root.querySelector('.phone-screen');
+      if(screen){const note=document.createElement('p');note.className='logic-phone-context';note.textContent='这里只保留近期消息。更早的聊天记录很多，暂时没有理由逐条翻。';screen.insertAdjacentElement('afterend',note);}
+    }
+  }
 }
 function polishNotes(root){
   [...root.querySelectorAll('.optional-group .clue small')].forEach(x=>x.remove());
@@ -111,6 +135,7 @@ function polishPaywall(){
 }
 function polishModal(){
   const root=$('#modalContent');if(!root||!root.children.length)return;
+  const card=root.closest('.modal-card');if(card)card.classList.remove('logic-memory-card');
   const title=root.querySelector('h2')?.textContent.trim()||'';
   if(title==='22:48')polishIntro(root);
   if(title==='防盗链')polishChain(root);
@@ -118,6 +143,7 @@ function polishModal(){
   if(title==='07:12 · 记忆核对')polishMemory(root);
   if(title==='时间线 · 第一步')polishTimeline(root);
   if(title==='房东周先生 · 电话')polishContact(root);
+  if(title==='手机')polishPhone(root);
   if(title==='随手记下的事')polishNotes(root);
   if(title==='703 · 陈阿姨')polishNeighbor(root);
   if(title==='身份交叉')polishIdentity(root);
@@ -125,6 +151,36 @@ function polishModal(){
   if(root.querySelector('.ending'))polishEnding(root);
 }
 
+function afterPaint(fn){
+  if(typeof requestAnimationFrame==='function')requestAnimationFrame(()=>requestAnimationFrame(fn));
+  else setTimeout(fn,0);
+}
+function wrapMemoryFlow(){
+  const toggle=window.__memoryToggle;
+  if(typeof toggle==='function'&&!toggle.__logicWrapped){
+    const wrapped=function(id){
+      const card=document.querySelector('.modal-card');
+      const y=card?card.scrollTop:0;
+      const result=toggle(id);
+      const immediate=document.querySelector('.modal-card');if(immediate)immediate.scrollTop=y;
+      afterPaint(()=>{
+        const next=document.querySelector('.modal-card');if(next)next.scrollTop=y;
+        const root=$('#modalContent');
+        if(root){const btn=[...root.querySelectorAll('button')].find(b=>(b.getAttribute('onclick')||'').includes(`__memoryToggle('${id}')`));if(btn&&typeof btn.focus==='function'){try{btn.focus({preventScroll:true})}catch(e){}}}
+      });
+      return result;
+    };wrapped.__logicWrapped=true;window.__memoryToggle=wrapped;
+  }
+}
+function wrapXuHistory(){
+  const read=window.__readXuHistory;
+  if(typeof read==='function'&&!read.__logicWrapped){
+    const wrapped=function(){
+      if(!xuHistoryUnlocked()){showToast('现在还没有理由翻到三个月前。先继续确认今晚留下的痕迹。');return;}
+      return read();
+    };wrapped.__logicWrapped=true;window.__readXuHistory=wrapped;
+  }
+}
 function wrapNeighborFlow(){
   const ask=window.__neighborAsk,finish=window.__finishNeighbor;
   if(typeof ask==='function'&&!ask.__logicWrapped){
@@ -164,13 +220,14 @@ function installObservers(){
 function selfCheck(){
   const checks={
     saveKey:typeof SAVE_KEY==='string',neighborWrapped:!!window.__finishNeighbor?.__logicWrapped,
+    memoryWrapped:!!window.__memoryToggle?.__logicWrapped,xuHistoryWrapped:!!window.__readXuHistory?.__logicWrapped,
     restartWrapped:!!window.__restart?.__logicWrapped,modalPresent:!!$('#modalContent'),
     gameQaPresent:!!window.__GAME_QA__,paywallIndependent:typeof window.Paywall==='object'
   };
   window.__LOGIC_FIX_QA__={checks,pass:Object.values(checks).every(Boolean),state:()=>state()};
 }
 function init(){
-  wrapNeighborFlow();wrapSaveActions();installObservers();polishModal();polishPaywall();selfCheck();
+  wrapNeighborFlow();wrapMemoryFlow();wrapXuHistory();wrapSaveActions();installObservers();polishModal();polishPaywall();selfCheck();
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
 })();
