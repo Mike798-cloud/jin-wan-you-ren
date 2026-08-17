@@ -5,11 +5,30 @@ const SAVE_KEY='tonight_someone_was_here_v2';
 const OLD_SAVE_KEY='tonight_someone_was_here_v1';
 const META_KEY='tonight_someone_was_here_meta';
 const STAGE={HOME:0,MEMORY:1,CONTACT:2,CHECK:3,TIMELINE:4,CHAIN:5,HALL:6,ROUTE:7,GAP:8,IDENTITY:9,FINAL:10,END:11};
-const LOGIC_FIX_VERSION='20260817h';
+const LOGIC_FIX_VERSION='20260817i';
 const QA_MODE=new URLSearchParams(location.search).get('qa')==='1';
 window.__LOGIC_FIX_VERSION__=LOGIC_FIX_VERSION;
 const SCENES=['entry','living','bedroom','bathroom','hallway'];
 const $=s=>document.querySelector(s);
+
+// Stability scheduler: coalesce observer work to one browser frame.
+// This prevents DOM polish -> MutationObserver -> polish feedback from creating microtask storms.
+const STABILITY={frames:0,tasks:0,errors:0,lastError:'',scheduled:false,queue:new Map()};
+function scheduleFrame(key,fn){
+  STABILITY.queue.set(key,fn);
+  if(STABILITY.scheduled)return;
+  STABILITY.scheduled=true;
+  const flush=()=>{
+    STABILITY.scheduled=false;STABILITY.frames++;
+    const tasks=[...STABILITY.queue.values()];STABILITY.queue.clear();
+    for(const task of tasks){
+      try{STABILITY.tasks++;task()}catch(err){STABILITY.errors++;STABILITY.lastError=String(err&&err.stack||err);console.error('[logic-fix]',err)}
+    }
+  };
+  if(typeof requestAnimationFrame==='function'&&!document.hidden)requestAnimationFrame(flush);
+  else setTimeout(flush,16);
+}
+window.__LOGIC_STABILITY__=STABILITY;
 
 function readJSON(key,fallback={}){
   try{return JSON.parse(localStorage.getItem(key)||'null')||fallback}catch(e){return fallback}
@@ -327,10 +346,15 @@ function nativeRoomButton(scene){
 }
 function goRoom(scene){
   if(!SCENES.includes(scene)||!canEnterRoom(scene)){showToast('现在还没有出去调查七楼。');return false}
+  const current=state().scene||$('#game')?.dataset.scene;
+  if(current===scene)return true;
+  const now=(typeof performance!=='undefined'&&performance.now)?performance.now():Date.now();
+  if(goRoom.lastScene===scene&&now-(goRoom.lastAt||0)<140)return false;
+  goRoom.lastScene=scene;goRoom.lastAt=now;
   const btn=nativeRoomButton(scene);
-  if(!btn){showToast('房间导航正在恢复，请再试一次。');repairRoomNavigation();return false}
-  // Calling the handler directly bypasses browser-specific hit-testing/overlay glitches.
-  if(typeof btn.onclick==='function')btn.onclick.call(btn,new MouseEvent('click',{bubbles:true,cancelable:true}));
+  if(!btn){showToast('房间导航正在恢复，请再试一次。');scheduleFrame('nav-repair',repairRoomNavigation);return false}
+  // Call the game's native room handler once; avoid synthetic click + touch double dispatch.
+  if(typeof btn.onclick==='function')btn.onclick.call(btn,{type:'logic-navigation',preventDefault(){},stopPropagation(){}});
   else btn.click();
   return true;
 }
@@ -400,15 +424,18 @@ function installNavigationFallbacks(){
   const nav=$('#quickNav');
   if(nav&&!nav.dataset.logicTouchBound){
     nav.dataset.logicTouchBound='1';
-    // A touchend fallback helps older iOS/embedded browsers that occasionally lose synthetic click on a scrollable nav.
+    // Pointer/click remains primary. touchend is only a fallback and is throttled by goRoom().
     nav.addEventListener('touchend',e=>{
       const btn=e.target.closest('button[data-logic-room]');if(!btn||btn.disabled)return;
       const scene=btn.dataset.logicRoom;if(!scene)return;
       e.preventDefault();goRoom(scene);
     },{passive:false});
   }
-  ['resize','orientationchange'].forEach(ev=>window.addEventListener(ev,()=>setTimeout(()=>{repairRoomNavigation();makeSidebarMapInteractive()},60),{passive:true}));
-  document.addEventListener('visibilitychange',()=>{if(!document.hidden){repairRoomNavigation();makeSidebarMapInteractive()}});
+  let resizeTimer=0;
+  const queueRepair=()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(()=>scheduleFrame('nav-repair',()=>{repairRoomNavigation();makeSidebarMapInteractive();updateSidebarMap()}),100)};
+  window.addEventListener('resize',queueRepair,{passive:true});
+  window.addEventListener('orientationchange',queueRepair,{passive:true});
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden)scheduleFrame('resume-ui',()=>{repairRoomNavigation();makeSidebarMapInteractive();updateSidebarMap();polishPaywall()})});
 }
 function polishNotes(root){
   [...root.querySelectorAll('.optional-group .clue small')].forEach(x=>x.remove());
@@ -696,12 +723,43 @@ function wrapSaveActions(){
   const restart=window.__restart;if(typeof restart==='function'&&!restart.__logicWrapped){const wrapped=function(){const s=state();if(!s.ending&&hasUnfinishedSave()&&!confirm('确定清除当前调查进度并回到标题吗？'))return;return restart()};wrapped.__logicWrapped=true;window.__restart=wrapped}
 }
 function installObservers(){
-  const root=$('#modalContent');if(root){let queued=false;new MutationObserver(()=>{if(queued)return;queued=true;queueMicrotask(()=>{queued=false;polishModal()})}).observe(root,{childList:true,subtree:true,characterData:true})}
-  const event=$('#eventLayer');if(event)new MutationObserver(polishEvent).observe(event,{childList:true,subtree:true,characterData:true});
-  const toast=$('#toast');if(toast)new MutationObserver(polishToast).observe(toast,{childList:true,subtree:true,characterData:true,attributes:true,attributeFilter:['class']});
-  const game=$('#game');if(game)new MutationObserver(()=>queueMicrotask(()=>{polishHUD();repairRoomNavigation();makeSidebarMapInteractive()})).observe(game,{attributes:true,attributeFilter:['data-scene','class'],childList:true,subtree:true,characterData:true});
-  const title=$('#titleScreen');if(title)new MutationObserver(polishTitleButtons).observe(title,{attributes:true,attributeFilter:['class']});
-  new MutationObserver(()=>polishPaywall()).observe(document.body,{childList:true,subtree:true});
+  // Modal: base game replaces modalContent children when a panel/puzzle changes.
+  // Do not observe characterData: our own wording edits must not recursively wake the observer.
+  const root=$('#modalContent');
+  if(root){
+    const ob=new MutationObserver(()=>scheduleFrame('modal',polishModal));
+    ob.observe(root,{childList:true,subtree:true});
+  }
+
+  // Event and toast layers are tiny. Watching child replacement/class is enough.
+  const event=$('#eventLayer');
+  if(event){const ob=new MutationObserver(()=>scheduleFrame('event',polishEvent));ob.observe(event,{childList:true,subtree:false})}
+  const toast=$('#toast');
+  if(toast){const ob=new MutationObserver(()=>scheduleFrame('toast',polishToast));ob.observe(toast,{childList:true,attributes:true,attributeFilter:['class']})}
+
+  // Every native render rebuilds quickNav. Use that as the render signal instead of watching the whole game subtree.
+  const nav=$('#quickNav');
+  if(nav){const ob=new MutationObserver(()=>scheduleFrame('hud',polishHUD));ob.observe(nav,{childList:true})}
+  const game=$('#game');
+  if(game){const ob=new MutationObserver(()=>scheduleFrame('hud',polishHUD));ob.observe(game,{attributes:true,attributeFilter:['data-scene','class']})}
+
+  // Title observer watches the title section itself only, so changing child button classes cannot loop back.
+  const title=$('#titleScreen');
+  if(title){const ob=new MutationObserver(()=>scheduleFrame('title',polishTitleButtons));ob.observe(title,{attributes:true,attributeFilter:['class']})}
+
+  // paywall.js is loaded before this file, so normally the overlay already exists. Observe only visibility class changes.
+  const attachPaywallObserver=()=>{
+    const overlay=$('#paywall-overlay');if(!overlay||overlay.dataset.logicStableObserved)return false;
+    overlay.dataset.logicStableObserved='1';
+    const ob=new MutationObserver(()=>scheduleFrame('paywall',polishPaywall));
+    ob.observe(overlay,{attributes:true,attributeFilter:['class']});
+    return true;
+  };
+  if(!attachPaywallObserver()){
+    const bootstrap=new MutationObserver(()=>{if(attachPaywallObserver()){bootstrap.disconnect();scheduleFrame('paywall',polishPaywall)}});
+    bootstrap.observe(document.body,{childList:true});
+    setTimeout(()=>bootstrap.disconnect(),5000);
+  }
 }
 function selfCheck(){
   const checks={
@@ -709,7 +767,7 @@ function selfCheck(){
     neighborWrapped:!!window.__finishNeighbor?.__logicWrapped,memoryWrapped:!!window.__memoryToggle?.__logicWrapped,
     xuHistoryWrapped:!!window.__readXuHistory?.__logicWrapped,restartWrapped:!!window.__restart?.__logicWrapped,
     timelineWrapped:!!window.__timeline?.__logicWrapped,gapExitWrapped:!!window.__closeGap?.__logicWrapped,identityWrapped:!!window.__identityCheck?.__logicWrapped,
-    sidebarMap:!!$('#logicSidebarMap'),modalPresent:!!$('#modalContent'),gameQaPresent:!!window.__GAME_QA__,routeCandidate:typeof polishRoute==='function',scheduleNote:typeof polishGap==='function',endingMotive:typeof polishEnding==='function',roomNavRepair:typeof repairRoomNavigation==='function',mapRoomSwitcher:typeof addMapRoomSwitcher==='function',stalledProgressRepair:typeof repairStalledStoredProgress==='function',roomGoFallback:typeof goRoom==='function'
+    sidebarMap:!!$('#logicSidebarMap'),modalPresent:!!$('#modalContent'),gameQaPresent:!!window.__GAME_QA__,routeCandidate:typeof polishRoute==='function',scheduleNote:typeof polishGap==='function',endingMotive:typeof polishEnding==='function',roomNavRepair:typeof repairRoomNavigation==='function',mapRoomSwitcher:typeof addMapRoomSwitcher==='function',stalledProgressRepair:typeof repairStalledStoredProgress==='function',roomGoFallback:typeof goRoom==='function',observerScheduler:typeof scheduleFrame==='function',stabilityMetrics:!!window.__LOGIC_STABILITY__
   };
   window.__LOGIC_FIX_QA__={version:LOGIC_FIX_VERSION,checks,pass:Object.values(checks).every(Boolean),state:()=>state(),hasUnfinishedSave};
 }

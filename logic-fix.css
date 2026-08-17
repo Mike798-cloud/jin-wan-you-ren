@@ -122,3 +122,15 @@ html,body,#app{height:100dvh!important;min-height:100svh!important}
   .quick-nav button{min-height:42px!important;padding:8px 11px!important}
 }
 @media(max-height:560px){.quick-nav{min-height:42px!important}.quick-nav button{min-height:36px!important}}
+
+/* 2026-08-17 stability pass: reduce compositor and animation cost on long sessions. */
+.film-grain{display:none!important;background-image:none!important;mix-blend-mode:normal!important}
+.scene-frame img{transition:none!important;will-change:auto!important}
+.scene-tint{mix-blend-mode:normal!important}
+#logicSidebarMap,.scene-frame{contain:paint}
+.quick-nav button,.top-actions button{touch-action:manipulation}
+@media(max-width:760px),(prefers-reduced-motion:reduce){
+  .event-text{animation:none!important}
+  .progress-track i,.choice-grid button,.modal-action,.evidence-btn,.tab-btn,.gap-item,.person-card{transition:none!important;transform:none!important}
+  .toast,.modal-card,.scene-frame,.sidebar-card{box-shadow:none!important}
+}
