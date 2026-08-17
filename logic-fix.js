@@ -5,7 +5,7 @@ const SAVE_KEY='tonight_someone_was_here_v2';
 const OLD_SAVE_KEY='tonight_someone_was_here_v1';
 const META_KEY='tonight_someone_was_here_meta';
 const STAGE={HOME:0,MEMORY:1,CONTACT:2,CHECK:3,TIMELINE:4,CHAIN:5,HALL:6,ROUTE:7,GAP:8,IDENTITY:9,FINAL:10,END:11};
-const LOGIC_FIX_VERSION='20260817g';
+const LOGIC_FIX_VERSION='20260817h';
 const QA_MODE=new URLSearchParams(location.search).get('qa')==='1';
 window.__LOGIC_FIX_VERSION__=LOGIC_FIX_VERSION;
 const SCENES=['entry','living','bedroom','bathroom','hallway'];
@@ -89,8 +89,10 @@ function polishHotspots(){
 }
 function polishHUD(){
   const s=state(),st=Math.max(0,Math.min(11,Number(s.stage)||0));
-  setText($('#objective'),HUD.objective[st]);
-  setText($('#objectiveSide'),HUD.objective[st]);
+  let objective=HUD.objective[st];
+  if(st===STAGE.HOME&&coreHomeClueCount()===2)objective='已经记下两处。可以换个房间继续看看。';
+  setText($('#objective'),objective);
+  setText($('#objectiveSide'),objective);
   setText($('#stageLabel'),HUD.stage[st]);
   setText($('#progressText'),HUD.progress[st]);
   setText($('#dangerText'),'记录会自动保存在这台设备上。');
@@ -100,6 +102,8 @@ function polishHUD(){
   polishTitleButtons();
   ensureSidebarMap();
   updateSidebarMap();
+  makeSidebarMapInteractive();
+  repairRoomNavigation();
   polishHotspots();
 }
 
@@ -145,7 +149,7 @@ function polishIntro(root){
   const shoe=ps.find(p=>p.textContent.includes('它们的位置不对'))||ps.find(p=>p.textContent.includes('玄关的拖鞋'));
   if(shoe)setHTML(shoe,'你在门内侧停了一下。鞋柜下方的浅色地砖边缘，有一道刚被鞋底带开的湿灰痕。');
   const tutorial=ps.find(p=>p.classList.contains('muted'));
-  setText(tutorial,'画面不会标出可调查点。按自己的顺序看看房间。');
+  setText(tutorial,'画面不会标出可调查点。底部房间栏可以直接移动；如果浏览器挡住底栏，也可以点顶部“位置”切换房间。');
 }
 function polishInspection(root,title){
   const s=state(),st=Number(s.stage)||0,p=root.querySelector(':scope > p');if(!p)return;
@@ -204,6 +208,7 @@ function polishHallInspection(root,title){
   if(title==='维修通知')setHTML(p,'电表箱旁压着一张七楼旧管线整改示意。图上标着：<b>705 与 704 之间保留一段旧设备检修夹道</b>。<br><br>两户卧室柜体后方各有一处封板检修口。');
 }
 function polishMap(root){
+  addMapRoomSwitcher(root);
   const s=state(),clues=isArr(s.clues)?s.clues:[],stage=Number(s.stage)||0;
   const cells=[...root.querySelectorAll('.floor-line > div')];
   cells.forEach(c=>c.classList.remove('you','empty'));
@@ -307,6 +312,104 @@ function polishOldChat(root){
     <button class="modal-action" onclick="window.__phone('messages')">返回消息</button>`);
 }
 function hasClue(id){const s=state();return isArr(s.clues)&&s.clues.includes(id)}
+function coreHomeClueCount(){
+  const s=state(),clues=isArr(s.clues)?s.clues:[];
+  return ['shoes','bottle','wetmat'].filter(id=>clues.includes(id)).length;
+}
+const ROOM_LABELS={entry:'玄关 / 厨房',living:'客厅',bedroom:'卧室',bathroom:'卫生间',hallway:'七楼走廊'};
+function canEnterRoom(scene){
+  const s=state();
+  return scene!=='hallway'||Number(s.stage)>=STAGE.HALL;
+}
+function nativeRoomButton(scene){
+  const label=ROOM_LABELS[scene];
+  return [...document.querySelectorAll('#quickNav button')].find(b=>(b.textContent||'').trim()===label)||null;
+}
+function goRoom(scene){
+  if(!SCENES.includes(scene)||!canEnterRoom(scene)){showToast('现在还没有出去调查七楼。');return false}
+  const btn=nativeRoomButton(scene);
+  if(!btn){showToast('房间导航正在恢复，请再试一次。');repairRoomNavigation();return false}
+  // Calling the handler directly bypasses browser-specific hit-testing/overlay glitches.
+  if(typeof btn.onclick==='function')btn.onclick.call(btn,new MouseEvent('click',{bubbles:true,cancelable:true}));
+  else btn.click();
+  return true;
+}
+window.__logicGoRoom=goRoom;
+function repairRoomNavigation(){
+  const nav=$('#quickNav');if(!nav)return;
+  nav.setAttribute('aria-label','房间导航，可切换房间');
+  const s=state();
+  [...nav.querySelectorAll('button')].forEach(btn=>{
+    const text=(btn.textContent||'').trim();
+    const scene=Object.keys(ROOM_LABELS).find(k=>ROOM_LABELS[k]===text);
+    if(!scene)return;
+    const locked=!canEnterRoom(scene);
+    btn.disabled=locked;
+    btn.classList.toggle('locked',locked);
+    btn.setAttribute('aria-disabled',locked?'true':'false');
+    btn.style.pointerEvents=locked?'none':'auto';
+    if(!locked){btn.tabIndex=0;btn.dataset.logicRoom=scene;}
+  });
+  // Mobile browsers sometimes keep a stale transparent support layer for a frame/timer.
+  const pay=$('#paywall-overlay');
+  if(pay&&!pay.classList.contains('paywall-show'))pay.style.pointerEvents='none';
+  if(pay&&pay.classList.contains('paywall-show'))pay.style.pointerEvents='auto';
+}
+function roomSwitcherHTML(){
+  const s=state();
+  return `<div class="logic-room-switcher" aria-label="切换房间">${Object.entries(ROOM_LABELS).map(([scene,label])=>{
+    const locked=!canEnterRoom(scene),current=(s.scene===scene);
+    return `<button type="button" class="${current?'current ':''}${locked?'locked':''}" ${locked?'disabled':''} onclick="window.__logicGoRoom('${scene}')">${label}</button>`;
+  }).join('')}</div>`;
+}
+function addMapRoomSwitcher(root){
+  if(root.querySelector('.logic-room-switcher'))return;
+  const grid=root.querySelector('.map-grid');
+  if(grid)grid.insertAdjacentHTML('beforebegin',`<h3>房间移动</h3>${roomSwitcherHTML()}`);
+  else root.insertAdjacentHTML('beforeend',`<h3>房间移动</h3>${roomSwitcherHTML()}`);
+}
+function makeSidebarMapInteractive(){
+  const card=$('#logicSidebarMap');if(!card)return;
+  card.querySelectorAll('.logic-room').forEach(el=>{
+    const scene=[...el.classList].find(x=>['entry','living','bedroom','bathroom'].includes(x));
+    if(!scene)return;
+    el.setAttribute('role','button');el.tabIndex=0;el.dataset.logicRoom=scene;
+    if(!el.dataset.logicNavBound){
+      el.dataset.logicNavBound='1';
+      el.addEventListener('click',()=>goRoom(scene));
+      el.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();goRoom(scene)}});
+    }
+  });
+}
+function repairStalledStoredProgress(){
+  let raw;try{raw=JSON.parse(localStorage.getItem(SAVE_KEY)||'null')}catch(e){return false}
+  if(!raw||typeof raw!=='object'||raw.ending)return false;
+  let changed=false;const clues=isArr(raw.clues)?raw.clues:[];const flags=raw.flags&&typeof raw.flags==='object'?raw.flags:{};
+  // Recover only states whose required facts are already present but the stage flag failed to advance.
+  if(Number(raw.stage)===STAGE.HOME&&['shoes','bottle','wetmat'].every(x=>clues.includes(x))){raw.stage=STAGE.MEMORY;raw.time='22:57';changed=true}
+  const checks=['twoCups','toothbrush','curtain','charger','towel'];
+  if(Number(raw.stage)===STAGE.CHECK&&checks.every(x=>clues.includes(x))){raw.stage=STAGE.TIMELINE;raw.time='23:20';changed=true}
+  if(Number(raw.stage)===STAGE.HALL&&['maintenance','shaftNotice','neighbor'].every(x=>clues.includes(x))){raw.stage=STAGE.ROUTE;raw.time='23:37';changed=true}
+  if(Number(raw.stage)===STAGE.GAP&&['tag','delivery','nest'].every(x=>clues.includes(x))){raw.stage=STAGE.IDENTITY;raw.time='23:47';changed=true}
+  raw.flags=flags;
+  if(changed){try{localStorage.setItem(SAVE_KEY,JSON.stringify(raw));return true}catch(e){}}
+  return false;
+}
+function installNavigationFallbacks(){
+  repairRoomNavigation();makeSidebarMapInteractive();
+  const nav=$('#quickNav');
+  if(nav&&!nav.dataset.logicTouchBound){
+    nav.dataset.logicTouchBound='1';
+    // A touchend fallback helps older iOS/embedded browsers that occasionally lose synthetic click on a scrollable nav.
+    nav.addEventListener('touchend',e=>{
+      const btn=e.target.closest('button[data-logic-room]');if(!btn||btn.disabled)return;
+      const scene=btn.dataset.logicRoom;if(!scene)return;
+      e.preventDefault();goRoom(scene);
+    },{passive:false});
+  }
+  ['resize','orientationchange'].forEach(ev=>window.addEventListener(ev,()=>setTimeout(()=>{repairRoomNavigation();makeSidebarMapInteractive()},60),{passive:true}));
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden){repairRoomNavigation();makeSidebarMapInteractive()}});
+}
 function polishNotes(root){
   [...root.querySelectorAll('.optional-group .clue small')].forEach(x=>x.remove());
   const groupNames=new Map([['生活异常','生活细节'],['客观记录','时间与外部记录'],['建筑与入口','建筑与通道'],['人物与停留','人物与现场'],['证据边界','最后判断']]);
@@ -469,7 +572,8 @@ function polishEnding(root){
   }
 }
 function polishPaywall(){
-  const overlay=$('#paywall-overlay');if(!overlay)return;
+  const overlay=$('#paywall-overlay');if(overlay&&!overlay.classList.contains('paywall-show'))overlay.style.pointerEvents='none';if(overlay&&overlay.classList.contains('paywall-show'))overlay.style.pointerEvents='auto';
+  if(!overlay)return;
   const body=overlay.querySelector('.paywall-msg-body');
   if(body)setHTML(body,'如果你玩到这里觉得还不错，愿意留下 <strong>1元</strong> 自愿支持，我会把它继续用在网页悬疑的素材、测试和后续更新上。');
   const last=overlay.querySelector('.paywall-msg-warm2');setText(last,'不支持也完全没关系。剧情、提示、结局和二周目都不会受影响。');
@@ -587,7 +691,7 @@ function wrapIdentityFlow(){
 function wrapSaveActions(){
   normalizeStoredSave();
   const start=$('#startBtn');if(start&&typeof start.onclick==='function'&&!start.dataset.logicWrapped){const orig=start.onclick;start.dataset.logicWrapped='1';start.onclick=function(e){if(hasUnfinishedSave()&&!confirm('已有未结束的调查存档。确定从22:48重新开始并覆盖它吗？'))return;return orig.call(this,e)}}
-  const cont=$('#continueBtn');if(cont&&typeof cont.onclick==='function'&&!cont.dataset.logicWrapped){const orig=cont.onclick;cont.dataset.logicWrapped='1';cont.onclick=function(e){normalizeStoredSave();return orig.call(this,e)}}
+  const cont=$('#continueBtn');if(cont&&typeof cont.onclick==='function'&&!cont.dataset.logicWrapped){const orig=cont.onclick;cont.dataset.logicWrapped='1';cont.onclick=function(e){normalizeStoredSave();repairStalledStoredProgress();return orig.call(this,e)}}
   const review=$('#reviewBtn');if(review&&typeof review.onclick==='function'&&!review.dataset.logicWrapped){const orig=review.onclick;review.dataset.logicWrapped='1';review.onclick=function(e){if(hasUnfinishedSave()&&!confirm('快速复盘会覆盖当前调查存档。确定继续吗？'))return;return orig.call(this,e)}}
   const restart=window.__restart;if(typeof restart==='function'&&!restart.__logicWrapped){const wrapped=function(){const s=state();if(!s.ending&&hasUnfinishedSave()&&!confirm('确定清除当前调查进度并回到标题吗？'))return;return restart()};wrapped.__logicWrapped=true;window.__restart=wrapped}
 }
@@ -595,7 +699,7 @@ function installObservers(){
   const root=$('#modalContent');if(root){let queued=false;new MutationObserver(()=>{if(queued)return;queued=true;queueMicrotask(()=>{queued=false;polishModal()})}).observe(root,{childList:true,subtree:true,characterData:true})}
   const event=$('#eventLayer');if(event)new MutationObserver(polishEvent).observe(event,{childList:true,subtree:true,characterData:true});
   const toast=$('#toast');if(toast)new MutationObserver(polishToast).observe(toast,{childList:true,subtree:true,characterData:true,attributes:true,attributeFilter:['class']});
-  const game=$('#game');if(game)new MutationObserver(()=>queueMicrotask(polishHUD)).observe(game,{attributes:true,attributeFilter:['data-scene','class'],childList:true,subtree:true,characterData:true});
+  const game=$('#game');if(game)new MutationObserver(()=>queueMicrotask(()=>{polishHUD();repairRoomNavigation();makeSidebarMapInteractive()})).observe(game,{attributes:true,attributeFilter:['data-scene','class'],childList:true,subtree:true,characterData:true});
   const title=$('#titleScreen');if(title)new MutationObserver(polishTitleButtons).observe(title,{attributes:true,attributeFilter:['class']});
   new MutationObserver(()=>polishPaywall()).observe(document.body,{childList:true,subtree:true});
 }
@@ -605,12 +709,12 @@ function selfCheck(){
     neighborWrapped:!!window.__finishNeighbor?.__logicWrapped,memoryWrapped:!!window.__memoryToggle?.__logicWrapped,
     xuHistoryWrapped:!!window.__readXuHistory?.__logicWrapped,restartWrapped:!!window.__restart?.__logicWrapped,
     timelineWrapped:!!window.__timeline?.__logicWrapped,gapExitWrapped:!!window.__closeGap?.__logicWrapped,identityWrapped:!!window.__identityCheck?.__logicWrapped,
-    sidebarMap:!!$('#logicSidebarMap'),modalPresent:!!$('#modalContent'),gameQaPresent:!!window.__GAME_QA__,routeCandidate:typeof polishRoute==='function',scheduleNote:typeof polishGap==='function',endingMotive:typeof polishEnding==='function'
+    sidebarMap:!!$('#logicSidebarMap'),modalPresent:!!$('#modalContent'),gameQaPresent:!!window.__GAME_QA__,routeCandidate:typeof polishRoute==='function',scheduleNote:typeof polishGap==='function',endingMotive:typeof polishEnding==='function',roomNavRepair:typeof repairRoomNavigation==='function',mapRoomSwitcher:typeof addMapRoomSwitcher==='function',stalledProgressRepair:typeof repairStalledStoredProgress==='function',roomGoFallback:typeof goRoom==='function'
   };
   window.__LOGIC_FIX_QA__={version:LOGIC_FIX_VERSION,checks,pass:Object.values(checks).every(Boolean),state:()=>state(),hasUnfinishedSave};
 }
 function init(){
-  normalizeStoredSave();wrapNeighborFlow();wrapMemoryFlow();wrapXuHistory();wrapTimelineFlow();wrapGapExit();wrapIdentityFlow();wrapSaveActions();ensureSidebarMap();installObservers();polishHUD();polishModal();polishEvent();polishPaywall();polishTitleButtons();selfCheck();
+  normalizeStoredSave();repairStalledStoredProgress();wrapNeighborFlow();wrapMemoryFlow();wrapXuHistory();wrapTimelineFlow();wrapGapExit();wrapIdentityFlow();wrapSaveActions();ensureSidebarMap();installNavigationFallbacks();installObservers();polishHUD();polishModal();polishEvent();polishPaywall();polishTitleButtons();selfCheck();
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
 })();

@@ -1,4 +1,4 @@
-/* 2026-08-17g — motive/logic hardening + spoiler-light narrative + grounded UI + persistent 2D map */
+/* 2026-08-17h — player navigation recovery + motive/logic hardening + grounded UI */
 
 /* Keep the scene itself primary; no permanent developer narration over the image. */
 .scene-caption > p{display:none!important}
@@ -96,3 +96,29 @@ body{font-family:"Microsoft YaHei","PingFang SC","Noto Sans CJK SC",Arial,sans-s
 @media(max-width:760px){
   .logic-chat-search{grid-template-columns:1fr}.logic-chat-search .modal-action{width:100%}
 }
+
+
+/* 2026-08-17h — cross-browser room navigation hardening.
+   Use dynamic viewport units so the room bar is not trapped behind mobile browser chrome. */
+html,body,#app{height:100dvh!important;min-height:100svh!important}
+.game{height:100dvh!important;min-height:100svh!important}
+.quick-nav{position:relative!important;z-index:24!important;min-height:48px!important;flex:0 0 auto!important;pointer-events:auto!important;touch-action:pan-x!important;-webkit-overflow-scrolling:touch}
+.quick-nav button{min-height:40px!important;pointer-events:auto;touch-action:manipulation;-webkit-tap-highlight-color:rgba(255,255,255,.06)}
+.quick-nav button:not(.locked){opacity:1!important}
+.play-area{min-height:0!important}
+.paywall-overlay:not(.paywall-show){pointer-events:none!important}
+.paywall-overlay.paywall-show{pointer-events:auto!important}
+.logic-room[role="button"]{cursor:pointer;touch-action:manipulation}
+.logic-room[role="button"]:focus-visible{outline:1px solid #b8ad96;outline-offset:-2px}
+.logic-room-switcher{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin:10px 0 16px}
+.logic-room-switcher button{min-height:42px;border:1px solid #ffffff1c;background:#0a0f12;color:#b8bcba;padding:9px 10px;text-align:center;cursor:pointer;touch-action:manipulation}
+.logic-room-switcher button.current{border-color:#8b80656f;color:#e0d9ca;background:#8b806512}
+.logic-room-switcher button.locked{opacity:.32;cursor:default}
+@media(max-width:760px){
+  .game{height:100dvh!important}
+  .topbar{flex:0 0 auto!important}
+  .play-area{min-height:0!important;overflow:hidden!important}
+  .quick-nav{position:sticky!important;bottom:0!important;z-index:26!important;padding-top:5px!important;padding-bottom:max(8px,env(safe-area-inset-bottom))!important;background:#080b0ef5!important;box-shadow:0 -8px 22px #0008}
+  .quick-nav button{min-height:42px!important;padding:8px 11px!important}
+}
+@media(max-height:560px){.quick-nav{min-height:42px!important}.quick-nav button{min-height:36px!important}}
