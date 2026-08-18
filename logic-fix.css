@@ -1,0 +1,136 @@
+/* 2026-08-17h — player navigation recovery + motive/logic hardening + grounded UI */
+
+/* Keep the scene itself primary; no permanent developer narration over the image. */
+.scene-caption > p{display:none!important}
+.scene-caption > span{display:none!important}
+
+/* Reduce the synthetic "AI horror website" finish. */
+html,body,#app{overflow:hidden!important}
+body{font-family:"Microsoft YaHei","PingFang SC","Noto Sans CJK SC",Arial,sans-serif!important}
+.title-card h1,.ending-title{font-family:"Songti SC","STSong",serif}
+.title-card{backdrop-filter:none!important;background:#080b0ee8!important;box-shadow:0 22px 60px #0009!important}
+.scene-frame{box-shadow:none!important;border-color:#ffffff12!important}
+.scene-frame img{filter:saturate(.82) contrast(1.02) brightness(.95)!important}
+.game[data-scene="entry"] .scene-frame img{filter:saturate(.84) contrast(1.02) brightness(.96)!important}
+.game[data-scene="living"] .scene-frame img{filter:saturate(.81) contrast(1.025) brightness(.95)!important}
+.game[data-scene="bedroom"] .scene-frame img{filter:saturate(.79) contrast(1.03) brightness(.94)!important}
+.game[data-scene="bathroom"] .scene-frame img{filter:saturate(.78) contrast(1.025) brightness(.95)!important}
+.game[data-scene="hallway"] .scene-frame img{filter:saturate(.72) contrast(1.045) brightness(.91)!important}
+.scene-tint{background:linear-gradient(0deg,#03060854 0%,transparent 26%,transparent 100%)!important;mix-blend-mode:normal!important}
+.film-grain{opacity:.035!important;mix-blend-mode:soft-light!important}
+.topbar,.game,.quick-nav,.play-area{background:#080b0e!important}
+.top-actions button,.quick-nav button{border-color:#ffffff13!important;background:#ffffff04!important;border-radius:0!important}
+.top-actions button:hover,.quick-nav button:hover{background:#ffffff09!important}
+.sidebar-card{position:relative;overflow:hidden;background:#0b0f12!important;border:1px solid #ffffff12!important;border-left:1px solid #ffffff12!important;min-height:88px!important;padding:14px!important}
+.sidebar-card::after{display:none!important}
+.modal{backdrop-filter:none!important;background:#010203df!important;overflow:hidden;color-scheme:dark}
+.modal-card{background:#0b0f12!important;box-shadow:0 20px 70px #000c!important;border-color:#ffffff1b!important;overflow-y:auto!important;overflow-x:hidden!important;overscroll-behavior:contain;scrollbar-gutter:stable;scrollbar-width:thin;scrollbar-color:#4b5153 #090c0f}
+.modal-card::-webkit-scrollbar{width:9px;height:9px}.modal-card::-webkit-scrollbar-track{background:#090c0f}.modal-card::-webkit-scrollbar-thumb{background:#4b5153;border:2px solid #090c0f;border-radius:8px}.modal-card::-webkit-scrollbar-corner{background:#090c0f}
+#modalContent{min-width:0;max-width:100%;overflow:visible}
+.choice-grid button,.modal-action,.evidence-btn,.tab-btn,.gap-item,.person-card{border-radius:0!important;transition:background .12s ease,border-color .12s ease!important;transform:none!important}
+.choice-grid button:hover,.evidence-btn:hover,.gap-item:hover,.person-card:hover{transform:none!important}
+.message{border-radius:2px!important}
+.photo-card{transform:none!important}
+.event-text{background:#090d10f3!important;box-shadow:0 10px 32px #0008!important;border-left-width:2px!important}
+
+/* Hide narrative/relationship material until it is actually earned. */
+.logic-history-locked{display:none!important}
+.logic-locked-evidence{opacity:.4!important;cursor:not-allowed!important}
+.logic-unverified-route{color:#707779!important}
+.modal-card.logic-memory-card{contain:layout paint}
+.modal-card.logic-memory-card .compare-layout,.modal-card.logic-memory-card .choice-grid{contain:layout}
+.modal-card.logic-memory-card .choice-grid button{min-height:56px}
+
+/* Persistent desktop 2D map. It shows position, not unsolved routes. */
+.logic-map-card{flex:1 1 180px;min-height:190px!important;display:flex;flex-direction:column}
+.logic-plan{display:grid;grid-template-columns:1.05fr 1.5fr;grid-template-rows:1fr 1fr;grid-template-areas:"bedroom living" "bathroom entry";gap:3px;flex:1;min-height:118px;margin-top:10px;padding:3px;border:1px solid #ffffff16;background:#070a0c}
+.logic-room{position:relative;display:flex;align-items:center;justify-content:center;border:1px solid #ffffff13;background:#0c1114;color:#7f8789;font-size:10px;letter-spacing:.03em;min-height:48px}
+.logic-room.bedroom{grid-area:bedroom}.logic-room.living{grid-area:living}.logic-room.bathroom{grid-area:bathroom}.logic-room.entry{grid-area:entry}
+.logic-room i{display:none;position:absolute;width:7px;height:7px;border-radius:50%;background:#d0c4a8;box-shadow:0 0 0 3px #d0c4a81c}
+.logic-room.current{color:#dad5ca;border-color:#8b80654f;background:#111619}.logic-room.current i{display:block;right:8px;bottom:8px}
+.logic-hall-row{display:none;grid-template-columns:1fr 1fr 1fr;gap:3px;margin-top:5px}.logic-hall-row.shown{display:grid}.logic-hall-row span{padding:6px 2px;text-align:center;border:1px solid #ffffff12;color:#717879;font:10px ui-monospace,monospace}.logic-hall-row span.current{border-color:#8b806552;color:#d6d0c2}
+.logic-map-note{min-height:1.5em!important;margin:7px 0 0!important;color:#777f80!important;font-size:10px!important;line-height:1.5!important}
+
+/* Safe area / compact screens. */
+.topbar{padding-left:max(18px,env(safe-area-inset-left));padding-right:max(18px,env(safe-area-inset-right))}
+.quick-nav{padding-left:max(12px,env(safe-area-inset-left));padding-right:max(12px,env(safe-area-inset-right));padding-bottom:max(10px,env(safe-area-inset-bottom))}
+.toast{bottom:max(24px,calc(env(safe-area-inset-bottom) + 12px))}
+@media(min-width:761px){.modal-card.logic-memory-card.wide{width:min(980px,calc(100vw - 44px))}}
+@media(max-width:760px){
+  .topbar{padding-left:max(10px,env(safe-area-inset-left));padding-right:max(10px,env(safe-area-inset-right))}
+  .modal{padding-top:max(8px,env(safe-area-inset-top));padding-right:max(8px,env(safe-area-inset-right));padding-bottom:max(8px,env(safe-area-inset-bottom));padding-left:max(8px,env(safe-area-inset-left))}
+  .modal-card{width:100%;max-height:calc(100dvh - max(16px,env(safe-area-inset-top)) - max(16px,env(safe-area-inset-bottom)))}
+  .modal-card.logic-memory-card{contain:none}.modal-card.logic-memory-card .choice-grid button{min-height:52px}
+  .choice-grid button,.modal-action,.evidence-btn,.tab-btn,.gap-item,.person-card{min-height:44px}
+}
+@media(orientation:landscape) and (max-height:520px) and (max-width:1000px){
+  .topbar{height:48px;flex-basis:48px}.play-area{display:grid;grid-template-columns:minmax(0,1fr) 190px;grid-template-rows:minmax(0,1fr);gap:7px;min-height:0;align-content:stretch;padding:6px}.scene-frame{height:100%;width:100%;aspect-ratio:auto;align-self:stretch}.desktop-sidebar{display:flex;min-height:0;overflow:auto;gap:6px}.sidebar-card{min-height:auto!important;padding:8px 10px!important}.sidebar-card p{margin:5px 0;font-size:11px}.sidebar-card b{font-size:19px}.logic-map-card{display:none!important}.quick-nav{padding-top:0;padding-bottom:max(5px,env(safe-area-inset-bottom))}.quick-nav button{padding:6px 9px}.event-text{top:3%;right:2%;width:min(360px,60%);padding:9px 11px;font-size:11px;line-height:1.6}.modal-card{max-height:94vh}
+}
+
+/* Evidence that supports motive without turning into an exposition card. */
+.logic-schedule-note{
+  margin:10px 0 14px;padding:11px 12px;border:1px solid #ffffff14;border-left:2px solid #8e866f;
+  background:#090d0f;color:#b9b9b4;font-size:12px;line-height:1.75
+}
+.logic-schedule-note b{display:block;margin-bottom:5px;color:#d6d1c5;font-weight:500}
+.logic-schedule-note p{margin:4px 0!important}
+.logic-schedule-note span{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;color:#c8c3b7;letter-spacing:.03em}
+
+/* 2026-08-17g — visual evidence consistency */
+.logic-memory-card .compare-layout.logic-single-memory{display:block!important;max-width:640px;margin-left:auto;margin-right:auto}
+.logic-memory-card .compare-layout.logic-single-memory .compare-shot{width:100%!important;max-width:none!important}
+
+.logic-hall-current{display:none;margin-top:5px;padding:5px 7px;border:1px solid #ffffff10;color:#b9b4a8;font-size:10px;background:#0a0e11}
+.logic-hall-current.shown{display:block}
+.logic-chat-search{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;margin:14px 0}
+.logic-chat-search input{min-width:0;height:42px;border:1px solid #ffffff20;background:#070a0c;color:#e2dfd6;padding:0 12px;font:inherit;outline:none}
+.logic-chat-search input:focus{border-color:#8b806570}
+.logic-chat-search .modal-action{margin:0!important;min-width:86px}
+
+
+/* 2026-08-17g — final consistency pass */
+.logic-map-card>.label{letter-spacing:.04em}
+.logic-hall-row span:first-child{border-color:#8b806533}
+.logic-extra-record{border-left:2px solid #7e765f55;padding-left:8px}
+.logic-chat-search+.muted{color:#6f7779!important}
+@media(max-width:760px){
+  .logic-chat-search{grid-template-columns:1fr}.logic-chat-search .modal-action{width:100%}
+}
+
+
+/* 2026-08-17h — cross-browser room navigation hardening.
+   Use dynamic viewport units so the room bar is not trapped behind mobile browser chrome. */
+html,body,#app{height:100dvh!important;min-height:100svh!important}
+.game{height:100dvh!important;min-height:100svh!important}
+.quick-nav{position:relative!important;z-index:24!important;min-height:48px!important;flex:0 0 auto!important;pointer-events:auto!important;touch-action:pan-x!important;-webkit-overflow-scrolling:touch}
+.quick-nav button{min-height:40px!important;pointer-events:auto;touch-action:manipulation;-webkit-tap-highlight-color:rgba(255,255,255,.06)}
+.quick-nav button:not(.locked){opacity:1!important}
+.play-area{min-height:0!important}
+.paywall-overlay:not(.paywall-show){pointer-events:none!important}
+.paywall-overlay.paywall-show{pointer-events:auto!important}
+.logic-room[role="button"]{cursor:pointer;touch-action:manipulation}
+.logic-room[role="button"]:focus-visible{outline:1px solid #b8ad96;outline-offset:-2px}
+.logic-room-switcher{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin:10px 0 16px}
+.logic-room-switcher button{min-height:42px;border:1px solid #ffffff1c;background:#0a0f12;color:#b8bcba;padding:9px 10px;text-align:center;cursor:pointer;touch-action:manipulation}
+.logic-room-switcher button.current{border-color:#8b80656f;color:#e0d9ca;background:#8b806512}
+.logic-room-switcher button.locked{opacity:.32;cursor:default}
+@media(max-width:760px){
+  .game{height:100dvh!important}
+  .topbar{flex:0 0 auto!important}
+  .play-area{min-height:0!important;overflow:hidden!important}
+  .quick-nav{position:sticky!important;bottom:0!important;z-index:26!important;padding-top:5px!important;padding-bottom:max(8px,env(safe-area-inset-bottom))!important;background:#080b0ef5!important;box-shadow:0 -8px 22px #0008}
+  .quick-nav button{min-height:42px!important;padding:8px 11px!important}
+}
+@media(max-height:560px){.quick-nav{min-height:42px!important}.quick-nav button{min-height:36px!important}}
+
+/* 2026-08-17 stability pass: reduce compositor and animation cost on long sessions. */
+.film-grain{display:none!important;background-image:none!important;mix-blend-mode:normal!important}
+.scene-frame img{transition:none!important;will-change:auto!important}
+.scene-tint{mix-blend-mode:normal!important}
+#logicSidebarMap,.scene-frame{contain:paint}
+.quick-nav button,.top-actions button{touch-action:manipulation}
+@media(max-width:760px),(prefers-reduced-motion:reduce){
+  .event-text{animation:none!important}
+  .progress-track i,.choice-grid button,.modal-action,.evidence-btn,.tab-btn,.gap-item,.person-card{transition:none!important;transform:none!important}
+  .toast,.modal-card,.scene-frame,.sidebar-card{box-shadow:none!important}
+}
